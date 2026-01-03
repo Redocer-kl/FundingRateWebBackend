@@ -130,12 +130,35 @@ CELERY_TIMEZONE = "UTC"
 from celery.schedules import crontab
 
 CELERY_BEAT_SCHEDULE = {
-    'scan-hyperliquid-every-10-min': {
-        'task': 'scanner.tasks.scan_hyperliquid_task',
-        'schedule': crontab(minute='*/10'), # Каждые 10 минут (00, 10, 20...)
+    'scan-hyperliquid': {
+        'task': 'scanner.tasks.scan_exchange_task',
+        'schedule': crontab(minute='*/10'),
+        'args': ('Hyperliquid',), # Передаем имя как аргумент
     },
     'scan-bitget': {
-        'task': 'scanner.tasks.scan_bitget_task',
-        'schedule': crontab(minute='*/15'), # Bitget можно чуть реже
+        'task': 'scanner.tasks.scan_exchange_task',
+        'schedule': crontab(minute='*/15'),
+        'args': ('Bitget',),
     },
+    # 'scan-apex': {
+    #     'task': 'scanner.tasks.scan_exchange_task',
+    #     'schedule': crontab(minute='*/20'),
+    #     'args': ('Apex',),
+    # },
+    #  'scan-paradex': {
+    #     'task': 'scanner.tasks.scan_exchange_task',
+    #     'schedule': crontab(minute='*/30'),
+    #     'args': ('Paradex',),
+    # },
+    'scan-edgex': {
+        'task': 'scanner.tasks.scan_exchange_task',
+        'schedule': crontab(minute='*/30'),
+        'args': ('EdgeX',),
+    },
+    # 'scan-paradex': {
+    #     'task': 'scanner.tasks.scan_exchange_task',
+    #     'schedule': crontab(minute='*/30'),
+    #     'args': ('Lighter',),
+    # },
+    
 }

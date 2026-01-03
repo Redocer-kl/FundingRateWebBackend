@@ -1,88 +1,95 @@
-import requests
 import time
-from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from datetime import datetime, timedelta, timezone
+from .base import BaseScanner
 
-class HyperliquidScanner:
+class HyperliquidScanner(BaseScanner):
     BASE_URL = "https://api.hyperliquid.xyz/info"
-    HEADERS = {"Content-Type": "application/json"}
 
     def __init__(self):
-        self.session = requests.Session() # Используем сессию для ускорения
+        super().__init__("Hyperliquid")
 
-    def _post(self, payload):
-        # Добавим небольшую задержку перед каждым запросом
-        time.sleep(0.2) 
-        try:
-            response = self.session.post(self.BASE_URL, json=payload, headers=self.HEADERS, timeout=10)
-            if response.status_code == 429:
-                print("Rate limit hit! Sleeping 5 seconds...")
-                time.sleep(5)
-                return self._post(payload) # Рекурсивная попытка
-            response.raise_for_status()
-            return response.json()
-        except Exception as e:
-            print(f"Ошибка HL: {e}")
-            return None
+    def fetch_tickers(self):
+        # 1. Получаем Universe
+        meta = self._post(self.BASE_URL, json_data={"type": "meta"})
+        # 2. Получаем цены
+        mids = self._post(self.BASE_URL, json_data={"type": "allMids"})
         
-    def get_tickers(self):
-        """
-        Получает список всех активов и их текущие цены.
-        """
-        print("Скачиваем мету и цены с Hyperliquid...")
-        
-        # 1. Получаем список монет (Universe)
-        meta = self._post({"type": "meta"})
-        if not meta: return []
-
-        # 2. Получаем текущие цены (AllMids)
-        mids = self._post({"type": "allMids"})
-        if not mids: return []
+        if not meta or not mids: return []
 
         results = []
         universe = meta.get('universe', [])
         
         for asset in universe:
-            symbol = asset['name']
-            price = mids.get(symbol)
+            original = asset['name'] # Например "BTC" или "1000PEPE"
             
+            # Нормализация для Hyperliquid (убираем "1000" для мемкоинов, если нужно)
+            clean_symbol = original
+            if original.startswith('1000'):
+                clean_symbol = original[4:]
+            
+            price = mids.get(original)
             if price:
                 results.append({
-                    'symbol': symbol,
+                    'symbol': clean_symbol,
+                    'original_symbol': original, # HL требует точное имя (н-р 1000PEPE)
                     'price': Decimal(str(price))
                 })
-        
         return results
 
-    def get_funding_history(self, coin, days=30):
-        """
-        Получает историю фандинга за N дней.
-        """
-        end_time_ms = int(time.time() * 1000)
-        start_time_ms = int((datetime.now() - timedelta(days=days)).timestamp() * 1000)
+    def fetch_funding_history(self, coin, lookback_days=30):
+        all_history = []
+        # Определяем точку старта (30 дней назад)
+        target_start_ms = int((datetime.now() - timedelta(days=lookback_days)).timestamp() * 1000)
+        
+        # Текущий указатель времени, который будем сдвигать вперед
+        current_start_ms = target_start_ms
 
-        payload = {
-            "type": "fundingHistory",
-            "coin": coin,
-            "startTime": start_time_ms,
-            "endTime": end_time_ms
-        }
-
-        data = self._post(payload)
-        if not data:
-            return []
-
-        history = []
-        for item in data:
-            # Преобразуем timestamp из мс в datetime с UTC
-            ts = datetime.fromtimestamp(item['time'] / 1000.0, tz=timezone.utc)
-            rate = Decimal(str(item['fundingRate']))
+        while True:
+            # Увеличил паузу, так как HL очень чувствителен к лимитам (видно по твоим логам)
+            time.sleep(0.5) 
             
-            # Hyperliquid начисляет фандинг каждый час
-            history.append({
-                'timestamp': ts,
-                'rate': rate,
-                'period_hours': 1
-            })
+            payload = {
+                "type": "fundingHistory",
+                "coin": coin,
+                "startTime": current_start_ms
+            }
             
-        return history
+            try:
+                data = self._post(self.BASE_URL, json_data=payload)
+                if not data or not isinstance(data, list):
+                    break
+
+                batch = []
+                last_ts_in_batch = current_start_ms
+                
+                for item in data:
+                    # Сохраняем время последней записи, чтобы в следующем цикле начать С НЕГО
+                    last_ts_in_batch = item['time']
+                    
+                    ts = datetime.fromtimestamp(item['time'] / 1000.0, tz=timezone.utc)
+                    batch.append({
+                        'timestamp': ts,
+                        'rate': Decimal(str(item['fundingRate'])),
+                        'period_hours': 1
+                    })
+                
+                all_history.extend(batch)
+                
+                # Если мы получили меньше 500 записей, значит мы дошли до "сейчас"
+                if len(data) < 500:
+                    break
+                
+                # Если получили ровно 500, значит впереди есть еще данные.
+                # Сдвигаем время старта на 1 мс вперед от последней полученной записи
+                if last_ts_in_batch <= current_start_ms:
+                    # Защита от бесконечного цикла, если API отдает одно и то же время
+                    break
+                    
+                current_start_ms = last_ts_in_batch + 1
+
+            except Exception as e:
+                print(f"Ошибка HL для {coin}: {e}")
+                break
+                
+        return all_history

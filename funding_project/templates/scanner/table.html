@@ -1,29 +1,36 @@
 {% extends 'scanner/base.html' %}
 {% load custom_filters %}
 
-{% block title %}Funding Scanner - Live Data{% endblock %}
-
 {% block content %}
 <div class="scanner-card">
-    
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h4 class="text-white mb-1">Historical Scanner</h4>
             <span class="text-muted-custom">Historical funding, best spreads ({{ current_period }})</span>
         </div>
-        <div>
+        <div class="d-flex gap-2">
+            <form method="GET" class="d-flex gap-2">
+                <input type="hidden" name="period" value="{{ current_period }}">
+                <input type="text" name="q" value="{{ search_query|default:'' }}" 
+                       class="form-control form-control-sm bg-dark text-white border-secondary" 
+                       placeholder="Search coin..." style="width: 180px;">
+                <button type="submit" class="btn btn-sm btn-warning">Search</button>
+                {% if search_query %}
+                    <a href="?period={{ current_period }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+                {% endif %}
+            </form>
             <a href="/" class="btn btn-sm btn-outline-secondary">Refresh</a>
         </div>
     </div>
-
+    
     <div class="mb-4 d-flex align-items-center flex-wrap">
         <span class="text-white me-3 fw-bold">PERIOD</span>
         
-        <a href="?period=1d" class="period-btn {% if current_period == '1d' %}active{% endif %}">1d</a>
-        <a href="?period=3d" class="period-btn {% if current_period == '3d' %}active{% endif %}">3d</a>
-        <a href="?period=7d" class="period-btn {% if current_period == '7d' %}active{% endif %}">7d</a>
-        <a href="?period=14d" class="period-btn {% if current_period == '14d' %}active{% endif %}">14d</a>
-        <a href="?period=30d" class="period-btn {% if current_period == '30d' %}active{% endif %}">30d</a>
+        <a href="?period=1d{% if search_query %}&q={{ search_query }}{% endif %}" class="period-btn {% if current_period == '1d' %}active{% endif %}">1d</a>
+        <a href="?period=3d{% if search_query %}&q={{ search_query }}{% endif %}" class="period-btn {% if current_period == '3d' %}active{% endif %}">3d</a>
+        <a href="?period=7d{% if search_query %}&q={{ search_query }}{% endif %}" class="period-btn {% if current_period == '7d' %}active{% endif %}">7d</a>
+        <a href="?period=14d{% if search_query %}&q={{ search_query }}{% endif %}" class="period-btn {% if current_period == '14d' %}active{% endif %}">14d</a>
+        <a href="?period=30d{% if search_query %}&q={{ search_query }}{% endif %}" class="period-btn {% if current_period == '30d' %}active{% endif %}">30d</a>
     </div>
 
     <div class="table-responsive">
@@ -40,47 +47,52 @@
                 </tr>
             </thead>
             <tbody>
-                {% for symbol in sorted_symbols %}
+                {% for symbol in page_obj %}
                     <tr>
                         <td colspan="7" class="coin-header">
-                            # {{ symbol }} 
+                            <a href="{% url 'coin_detail' symbol %}" class="text-decoration-none" style="color: #f0b90b;">
+                                # {{ symbol }} <small class="text-muted ms-2" style="font-size: 0.7rem;">(View Chart ↗)</small>
+                            </a>
                         </td>
                     </tr>
-
                     {% for row in grouped_data|get_item:symbol %}
                     <tr class="data-row">
-                        <td>
-                            <span class="fw-bold">{{ row.exchange }}</span>
-                        </td>
-                        
-                        <td class="text-end {% if row.live_rate > 0 %}text-pos{% elif row.live_rate < 0 %}text-neg{% endif %}">
-                            {{ row.live_rate|floatformat:4 }}%
-                        </td>
-
-                        <td class="text-end text-white">
-                            ${{ row.price|floatformat:2 }}
-                        </td>
-
-                        <td class="text-end fw-bold {% if row.live_apr > 0 %}text-pos{% elif row.live_apr < 0 %}text-neg{% endif %}">
-                            {{ row.live_apr|floatformat:2 }}%
-                        </td>
-
-                        <td class="text-end {% if row.hist_rate > 0 %}text-pos{% elif row.hist_rate < 0 %}text-neg{% endif %}" style="background-color: #2b313930;">
-                            {{ row.hist_rate|floatformat:4 }}%
-                        </td>
-
-                        <td class="text-end fw-bold {% if row.hist_apr > 0 %}text-pos{% elif row.hist_apr < 0 %}text-neg{% endif %}" style="background-color: #2b313930;">
-                            {{ row.hist_apr|floatformat:2 }}%
-                        </td>
-
-                        <td class="text-center text-white">
-                            {{ row.payouts }}
-                        </td>
+                        <td><span class="fw-bold">{{ row.exchange }}</span></td>
+                        <td class="text-end {% if row.live_rate > 0 %}text-pos{% elif row.live_rate < 0 %}text-neg{% endif %}">{{ row.live_rate|floatformat:4 }}%</td>
+                        <td class="text-end text-white">${{ row.price|floatformat:2 }}</td>
+                        <td class="text-end fw-bold {% if row.live_apr > 0 %}text-pos{% elif row.live_apr < 0 %}text-neg{% endif %}">{{ row.live_apr|floatformat:2 }}%</td>
+                        <td class="text-end {% if row.hist_rate > 0 %}text-pos{% elif row.hist_rate < 0 %}text-neg{% endif %}" style="background-color: #2b313930;">{{ row.hist_rate|floatformat:4 }}%</td>
+                        <td class="text-end fw-bold {% if row.hist_apr > 0 %}text-pos{% elif row.hist_apr < 0 %}text-neg{% endif %}" style="background-color: #2b313930;">{{ row.hist_apr|floatformat:2 }}%</td>
+                        <td class="text-center text-white">{{ row.payouts }}</td>
                     </tr>
                     {% endfor %}
                 {% endfor %}
             </tbody>
         </table>
     </div>
+
+    <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link bg-dark border-secondary text-white" 
+                       href="?period={{ current_period }}&page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">Previous</a>
+                </li>
+            {% endif %}
+
+            <li class="page-item active">
+                <span class="page-link bg-secondary border-secondary text-white">
+                    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                </span>
+            </li>
+
+            {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link bg-dark border-secondary text-white" 
+                       href="?period={{ current_period }}&page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">Next</a>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
 </div>
 {% endblock %}

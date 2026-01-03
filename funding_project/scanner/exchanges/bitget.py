@@ -1,29 +1,37 @@
-import requests
 import time
 from decimal import Decimal
 from datetime import datetime, timezone
+from .base import BaseScanner # Обязательно наследуемся от BaseScanner
 
-class BitgetScanner:
-    # Используем v2
+class BitgetScanner(BaseScanner): # Наследуемся
     TICKERS_URL = "https://api.bitget.com/api/v2/mix/market/tickers"
     FUNDING_URL = "https://api.bitget.com/api/v2/mix/market/history-fund-rate"
 
-    def get_tickers(self):
-        print("Скачиваем цены с Bitget...")
-        # Указываем productType явно
+    def __init__(self):
+        super().__init__("Bitget")
+
+    def fetch_tickers(self):
         params = {"productType": "USDT-FUTURES"}
         try:
-            resp = requests.get(self.TICKERS_URL, params=params, timeout=10).json()
+            resp = self._get(self.TICKERS_URL, params=params)
             data = resp.get("data")
-            
-            # Защита от None
-            if data is None:
-                return []
+            if data is None: return []
             
             results = []
             for item in data:
+                original = item['symbol']  # Например, "BTCUSDT"
+                
+                # НОРМАЛИЗАЦИЯ: убираем USDT в конце
+                # Если символ "BTCUSDT", останется "BTC"
+                clean_symbol = original
+                if original.endswith('USDT'):
+                    clean_symbol = original[:-4]
+                elif original.endswith('USDT_SUMP'): # На всякий случай для экзотики
+                    clean_symbol = original.replace('USDT_SUMP', '')
+
                 results.append({
-                    'symbol': item['symbol'], 
+                    'symbol': clean_symbol,          # Для нашей базы (группировки)
+                    'original_symbol': original,     # Для будущих запросов к API
                     'price': Decimal(str(item['lastPr']))
                 })
             return results
@@ -31,22 +39,23 @@ class BitgetScanner:
             print(f"Ошибка получения тикеров Bitget: {e}")
             return []
 
-    def get_funding_history(self, symbol):
-        # Добавляем небольшую задержку, чтобы не получить бан по IP
-        time.sleep(0.1)
+    # БЫЛО: get_funding_history -> СТАЛО: fetch_funding_history
+    def fetch_funding_history(self, original_symbol, lookback_days=30):
+        # 1. Вычисляем время начала в миллисекундах
+        end_time = int(time.time() * 1000)
+        start_time = end_time - (lookback_days * 24 * 60 * 60 * 1000)
         
-        # ВАЖНО: Bitget V2 требует productType и для истории
+        # Bitget V2 API позволяет до 100 записей. 
+        # 30 дней * 3 выплаты = 90 записей. 100 как раз хватает.
         params = {
-            "symbol": symbol, 
+            "symbol": original_symbol, 
             "productType": "USDT-FUTURES", 
-            "limit": 10
+            "limit": 100,
+            "startTime": start_time
         }
         
         try:
-            resp = requests.get(self.FUNDING_URL, params=params, timeout=10).json()
-            
-            # ИСПРАВЛЕНИЕ ОШИБКИ:
-            # Если data придет как None, мы заменим его на пустой список
+            resp = self._get(self.FUNDING_URL, params=params)
             data = resp.get("data") or [] 
             
             history = []
@@ -57,8 +66,8 @@ class BitgetScanner:
                     'rate': Decimal(str(item['fundingRate'])),
                     'period_hours': 8 
                 })
+                
             return history
-            
         except Exception as e:
-            print(f"Ошибка истории Bitget для {symbol}: {e}")
+            print(f"Ошибка истории Bitget для {original_symbol}: {e}")
             return []
