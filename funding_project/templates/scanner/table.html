@@ -1,0 +1,86 @@
+{% extends 'scanner/base.html' %}
+{% load custom_filters %}
+
+{% block title %}Funding Scanner - Live Data{% endblock %}
+
+{% block content %}
+<div class="scanner-card">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="text-white mb-1">Historical Scanner</h4>
+            <span class="text-muted-custom">Historical funding, best spreads ({{ current_period }})</span>
+        </div>
+        <div>
+            <a href="/" class="btn btn-sm btn-outline-secondary">Refresh</a>
+        </div>
+    </div>
+
+    <div class="mb-4 d-flex align-items-center flex-wrap">
+        <span class="text-white me-3 fw-bold">PERIOD</span>
+        
+        <a href="?period=1d" class="period-btn {% if current_period == '1d' %}active{% endif %}">1d</a>
+        <a href="?period=3d" class="period-btn {% if current_period == '3d' %}active{% endif %}">3d</a>
+        <a href="?period=7d" class="period-btn {% if current_period == '7d' %}active{% endif %}">7d</a>
+        <a href="?period=14d" class="period-btn {% if current_period == '14d' %}active{% endif %}">14d</a>
+        <a href="?period=30d" class="period-btn {% if current_period == '30d' %}active{% endif %}">30d</a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table-custom">
+            <thead>
+                <tr>
+                    <th>Exchange</th>
+                    <th class="text-end">Live Fund</th>
+                    <th class="text-end">Live Price</th>
+                    <th class="text-end">Live APR</th>
+                    <th class="text-end" style="background-color: #2b313930;">Hist. Fund (Avg)</th>
+                    <th class="text-end" style="background-color: #2b313930;">APR (Avg)</th>
+                    <th class="text-center">Payouts/Day</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for symbol in sorted_symbols %}
+                    <tr>
+                        <td colspan="7" class="coin-header">
+                            # {{ symbol }} 
+                        </td>
+                    </tr>
+
+                    {% for row in grouped_data|get_item:symbol %}
+                    <tr class="data-row">
+                        <td>
+                            <span class="fw-bold">{{ row.exchange }}</span>
+                        </td>
+                        
+                        <td class="text-end {% if row.live_rate > 0 %}text-pos{% elif row.live_rate < 0 %}text-neg{% endif %}">
+                            {{ row.live_rate|floatformat:4 }}%
+                        </td>
+
+                        <td class="text-end text-white">
+                            ${{ row.price|floatformat:2 }}
+                        </td>
+
+                        <td class="text-end fw-bold {% if row.live_apr > 0 %}text-pos{% elif row.live_apr < 0 %}text-neg{% endif %}">
+                            {{ row.live_apr|floatformat:2 }}%
+                        </td>
+
+                        <td class="text-end {% if row.hist_rate > 0 %}text-pos{% elif row.hist_rate < 0 %}text-neg{% endif %}" style="background-color: #2b313930;">
+                            {{ row.hist_rate|floatformat:4 }}%
+                        </td>
+
+                        <td class="text-end fw-bold {% if row.hist_apr > 0 %}text-pos{% elif row.hist_apr < 0 %}text-neg{% endif %}" style="background-color: #2b313930;">
+                            {{ row.hist_apr|floatformat:2 }}%
+                        </td>
+
+                        <td class="text-center text-white">
+                            {{ row.payouts }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

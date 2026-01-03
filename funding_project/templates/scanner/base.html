@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Funding Scanner{% endblock %}</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        body {
+            background-color: #0b0e11; /* Глубокий черный фон */
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-size: 0.9rem;
+            color: #eaecef;
+        }
+        
+        /* Стили для карточки */
+        .scanner-card {
+            background-color: #151a21;
+            border-radius: 8px;
+            border: 1px solid #2a2e39;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        /* Кнопки периода */
+        .period-btn {
+            background-color: #1e2329;
+            border: 1px solid #2a2e39;
+            color: #848e9c;
+            border-radius: 20px;
+            padding: 4px 16px;
+            margin-right: 5px;
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+            display: inline-block;
+        }
+        .period-btn:hover {
+            background-color: #2b3139;
+            color: #eaecef;
+            border-color: #474d57;
+        }
+        .period-btn.active {
+            background-color: #2b3139;
+            color: #f0b90b; /* Активный цвет (желтый) */
+            border-color: #f0b90b;
+        }
+
+        /* Таблица */
+        .table-custom {
+            width: 100%;
+            border-collapse: separate; 
+            border-spacing: 0;
+        }
+        .table-custom th {
+            color: #848e9c;
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            padding: 12px 8px;
+            border-bottom: 1px solid #2a2e39;
+        }
+        .table-custom td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #2a2e39;
+            vertical-align: middle;
+        }
+
+        /* Заголовок монеты */
+        .coin-header {
+            background-color: #1e2329;
+            color: #f0b90b;
+            font-weight: bold;
+            font-size: 0.95rem;
+            padding: 10px 16px;
+            border-bottom: 1px solid #2a2e39;
+        }
+
+        /* Цвета */
+        .text-pos { color: #0ecb81; }
+        .text-neg { color: #f6465d; }
+        .text-muted-custom { color: #848e9c; }
+        
+        /* Hover эффект для строк */
+        tr.data-row:hover td {
+            background-color: #2b313930;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container-fluid mt-4">
+        {% block content %}
+        {% endblock %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
