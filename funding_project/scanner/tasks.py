@@ -1,96 +1,80 @@
 from celery import shared_task
 from .models import Exchange, Ticker, FundingRate
 from django.utils import timezone
+from datetime import timedelta
+from decimal import Decimal, getcontext
+import time
 
-# Импортируем сканеры
+getcontext().prec = 28
+
 from .exchanges.bitget import BitgetScanner
 from .exchanges.hyperliquid import HyperliquidScanner
-from .exchanges.apex import ApexScanner
 from .exchanges.paradex import ParadexScanner
-from .exchanges.edgex import EdgeXScanner
-from .exchanges.lighter import LighterScanner
-from .exchanges.extended import ExtendedScanner
 
-# Реестр сканеров
 SCANNERS = {
     'Bitget': BitgetScanner,
     'Hyperliquid': HyperliquidScanner,
-    'Apex': ApexScanner,
     'Paradex': ParadexScanner,
-    'EdgeX':  EdgeXScanner,
-    'Lighter': LighterScanner,
-    'Extended': ExtendedScanner
 }
 
 @shared_task
 def scan_exchange_task(exchange_name):
-    """
-    Универсальная задача сканирования биржи.
-    Принимает имя биржи (ключ в SCANNERS).
-    """
     if exchange_name not in SCANNERS:
         return f"Сканер для {exchange_name} не найден"
     
-    # Инициализация
-    ScannerClass = SCANNERS[exchange_name]
-    scanner = ScannerClass() # Если нужны API ключи, их можно брать из settings
-    
-    print(f"Запуск сканирования: {exchange_name}")
-    
-    # 1. Получаем тикеры
+    scanner = SCANNERS[exchange_name]()
     market_data = scanner.fetch_tickers()
     if not market_data:
         return f"{exchange_name}: Нет данных тикеров"
     
-    # Создаем/получаем биржу в БД
     exchange_obj, _ = Exchange.objects.get_or_create(name=exchange_name)
-    
     processed_count = 0
     
-    # Ограничиваем список для теста, если нужно (например, первые 50)
-    # market_data = market_data[:50] 
-    
     for item in market_data:
-        # Сохраняем тикер
         ticker, _ = Ticker.objects.update_or_create(
             exchange=exchange_obj,
             symbol=item['symbol'],
             defaults={'last_price': item['price']}
         )
         
-        # Определяем, сколько истории качать
         last_entry = FundingRate.objects.filter(ticker=ticker).order_by('-timestamp').first()
+        lookback = 1 if last_entry else 30
         
-        # Логика "lookback" должна быть внутри метода fetch_funding_history или передаваться
-        # В BaseScanner мы договорились передавать lookback_days
-        days_to_fetch = 1 if last_entry else 30
+        history = scanner.fetch_funding_history(item.get('original_symbol', item['symbol']), lookback_days=lookback)
         
-        # Скачиваем историю
-        # Важно передавать original_symbol, так как в API может быть "BTC-USD-PERP", а у нас в БД просто "BTC"
-        history = scanner.fetch_funding_history(item.get('original_symbol', item['symbol']), lookback_days=days_to_fetch)
-        
+        existing_ts = set(FundingRate.objects.filter(
+            ticker=ticker, 
+            timestamp__gte=timezone.now() - timedelta(days=lookback + 1)
+        ).values_list('timestamp', flat=True))
+
         new_records = []
         for row in history:
-            # Проверка на дубли
-            if not FundingRate.objects.filter(ticker=ticker, timestamp=row['timestamp']).exists():
-                # Расчет APR
-                # Формула: rate * (24 / period_hours) * 365 * 100
-                period = row.get('period_hours', 8) # По дефолту 8, если сканер не вернул
-                if period == 0: period = 1 # Защита от деления на ноль
+            if row['timestamp'] in existing_ts:
+                continue
                 
-                daily_rate = row['rate'] * (24 // period) # Упрощенно
-                apr_val = daily_rate * 365 * 100
-                
-                new_records.append(FundingRate(
-                    ticker=ticker,
-                    timestamp=row['timestamp'],
-                    rate=row['rate'],
-                    period_hours=period,
-                    apr=apr_val
-                ))
+            rate = Decimal(str(row['rate']))
+            period = Decimal(str(row.get('period_hours', 1)))
+            
+            # Стандартная формула APR
+            apr_val = rate * (Decimal('24') / period) * Decimal('365') * Decimal('100')
+            
+            # Технический фильтр от мусора
+            if abs(apr_val) > Decimal('2000'):
+                continue
+
+            new_records.append(FundingRate(
+                ticker=ticker,
+                timestamp=row['timestamp'],
+                rate=rate,
+                period_hours=float(period),
+                apr=apr_val.quantize(Decimal("0.0001"))
+            ))
+            existing_ts.add(row['timestamp'])
         
         if new_records:
-            FundingRate.objects.bulk_create(new_records)
+            FundingRate.objects.bulk_create(new_records, ignore_conflicts=True)
             processed_count += len(new_records)
+        
+        time.sleep(0.05) # Небольшая пауза
             
-    return f"{exchange_name}: Обработано записей {processed_count}"
+    return f"{exchange_name}: Успешно обновлено {processed_count} записей"

@@ -1,4 +1,3 @@
-# exchanges/edgex.py
 import time
 import re
 import logging

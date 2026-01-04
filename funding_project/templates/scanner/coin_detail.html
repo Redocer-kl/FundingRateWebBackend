@@ -3,11 +3,38 @@
 {% block content %}
 <div class="scanner-card">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><span class="text-muted">History for</span> {{ symbol }}</h2>
-        <a href="/" class="btn btn-outline-secondary">Back to Table</a>
+        <h2><span class="text-muted">История для</span> {{ symbol }}</h2>
+        <a href="/" class="btn btn-outline-secondary">← К таблице</a>
     </div>
 
-    <div style="height: 500px;">
+    <div class="row mb-4">
+        {% for stat in summary_stats %}
+        <div class="col-md-4">
+            <div class="p-3 rounded" style="background: #1e2329; border-left: 4px solid {{ stat.color }};">
+                <h5 style="color: {{ stat.color }}">{{ stat.exchange }}</h5>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted">Цена:</span>
+                    <span class="text-white">${{ stat.price|floatformat:2 }}</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted">Текущий APR:</span>
+                    <span class="{% if stat.current_apr > 0 %}text-pos{% else %}text-neg{% endif %}">
+                        {{ stat.current_apr|floatformat:2 }}%
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between border-top mt-2 pt-2">
+                    <span class="text-muted">Средний APR (30д):</span>
+                    <span class="fw-bold text-white">{{ stat.avg_apr|floatformat:2 }}%</span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="mb-3">
+        <h5 class="text-white">График APR % (30 дней)</h5>
+    </div>
+    <div style="height: 500px; background: #1e2329; padding: 15px; rounded: 8px;">
         <canvas id="fundingChart"></canvas>
     </div>
 </div>
@@ -20,7 +47,6 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const dataElement = document.getElementById('chart-data');
-        
         if (dataElement) {
             const chartData = JSON.parse(dataElement.textContent);
             const ctx = document.getElementById('fundingChart').getContext('2d');
@@ -31,58 +57,30 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    // 'nearest' лучше подходит, когда у бирж разное количество точек
-                    interaction: {
-                        intersect: false,
-                        mode: 'nearest',
-                        axis: 'x'
-                    },
+                    interaction: { intersect: false, mode: 'index', axis: 'x' },
                     scales: {
                         x: { 
                             type: 'time',
-                            time: {
-                                // Автоматически подбирает масштаб (час/день)
-                                tooltipFormat: 'yyyy-MM-dd HH:mm',
-                                displayFormats: {
-                                    hour: 'HH:mm',
-                                    day: 'MMM dd'
-                                }
+                            time: { 
+                                tooltipFormat: 'dd.MM.yyyy HH:mm',
+                                displayFormats: { hour: 'HH:mm', day: 'dd MMM' }
                             },
-                            ticks: { 
-                                color: '#848e9c', 
-                                maxTicksLimit: 15,
-                                autoSkip: true 
-                            },
+                            ticks: { color: '#848e9c' },
                             grid: { color: '#2a2e39' }
                         },
                         y: { 
-                            ticks: { color: '#848e9c' },
+                            ticks: { color: '#848e9c', callback: (v) => v + '%' },
                             grid: { color: '#2a2e39' },
-                            title: { display: true, text: 'APR %', color: '#848e9c' }
+                            title: { display: true, text: 'Годовой процент (APR)', color: '#848e9c' }
                         }
                     },
                     plugins: {
-                        legend: { 
-                            display: true, 
-                            position: 'top',
-                            labels: { color: '#eaecef', padding: 20 } 
-                        },
+                        legend: { labels: { color: '#eaecef' } },
                         tooltip: {
                             backgroundColor: '#1e2329',
-                            titleColor: '#f0b90b',
-                            bodyColor: '#eaecef',
-                            borderColor: '#474d57',
-                            borderWidth: 1,
-                            padding: 10,
-                            // Включаем отображение всех точек в тултипе даже в режиме nearest
                             callbacks: {
                                 label: function(context) {
-                                    let label = context.dataset.label || '';
-                                    if (label) { label += ': '; }
-                                    if (context.parsed.y !== null) {
-                                        label += context.parsed.y.toFixed(4) + '%';
-                                    }
-                                    return label;
+                                    return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + '%';
                                 }
                             }
                         }

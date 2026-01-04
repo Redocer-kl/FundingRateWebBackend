@@ -1,63 +1,95 @@
-from decimal import Decimal
-from datetime import datetime, timezone
 import time
+from decimal import Decimal
+from datetime import datetime, timezone, timedelta
 from .base import BaseScanner
 
 class ParadexScanner(BaseScanner):
-    BASE_URL = "https://api.prod.paradex.trade/v1"
+    BASE_URL = "https://api.prod.paradex.trade"
+    SAMPLE_INTERVAL_MINUTES = 60
 
     def __init__(self):
         super().__init__("Paradex")
 
+    def _normalize_symbol(self, raw: str) -> str:
+        if not raw: return raw
+        return raw.split('-')[0].upper()
+
     def fetch_tickers(self):
-        url = f"{self.BASE_URL}/markets"
+        url = f"{self.BASE_URL}/v1/markets/summary"
         try:
-            # В ответе Paradex данные лежат в ключе 'results'
-            data = self._get(url)
-            results = []
-            for item in data.get('results', []):
-                # Берем только бессрочные контракты (PERP)
-                if item.get('asset_kind') == 'PERP':
-                    results.append({
-                        'symbol': item['symbol'],
-                        'original_symbol': item['symbol'],
-                        'price': Decimal('1.0') # У Paradex цена берется из другого места, для начала поставим заглушку или fetch_prices
+            data = self._get(url, params={'market': 'ALL'})
+            results = data.get('results', []) if isinstance(data, dict) else data
+            out = []
+            for r in results:
+                symbol = r.get('symbol', '')
+                if not symbol.endswith('-PERP'): continue
+                price = r.get('mark_price') or r.get('last_traded_price')
+                if price:
+                    out.append({
+                        'symbol': self._normalize_symbol(symbol),
+                        'original_symbol': symbol,
+                        'price': Decimal(str(price))
                     })
-            return results
+            return out
         except Exception as e:
-            print(f"Ошибка Paradex: {e}")
+            print(f"Paradex fetch_tickers error: {e}")
             return []
 
-    def fetch_funding_history(self, original_symbol, lookback_days=30):
-        url = f"{self.BASE_URL}/funding/history"
+    def fetch_funding_history(self, market, lookback_days=30, sample_minutes=60):
+        all_history = []
+        now = datetime.now(tz=timezone.utc)
+        start_dt = now - timedelta(days=lookback_days)
+        start_ts_ms = int(start_dt.timestamp() * 1000)
         
-        # Paradex использует start_at и end_at (timestamp in ms)
-        end_at = int(time.time() * 1000)
-        start_at = end_at - (lookback_days * 24 * 3600 * 1000)
-        
+        url = f"{self.BASE_URL}/v1/funding/data"
         params = {
-            "market": original_symbol,
-            "start_at": start_at,
-            "end_at": end_at,
-            "page_size": 100 # Пагинация может потребоваться для больших диапазонов
+            'market': market,
+            'page_size': 100  # Максимально допустимый размер
         }
         
-        try:
-            data = self._get(url, params=params)
-            history = []
-            
-            for item in data.get('results', []):
-                # Paradex фандинг часто идет почасовой или 8-часовой, зависит от рынка.
-                # Обычно 1 час.
-                ts = datetime.fromtimestamp(item['timestamp'] / 1000.0, tz=timezone.utc)
+        seen_floored = set()
+        cursor = None
+        # Увеличиваем лимит итераций, чтобы уйти глубже в историю
+        for _ in range(300): 
+            if cursor:
+                params['cursor'] = cursor
+
+            try:
+                data = self._get(url, params=params)
+                if not data or not isinstance(data, dict): break
                 
-                history.append({
-                    'timestamp': ts,
-                    'rate': Decimal(str(item['funding_rate'])),
-                    'period_hours': 1 
-                })
-            
-            return history
-        except Exception as e:
-            print(f"Error Paradex funding: {e}")
-            return []
+                results = data.get('results', [])
+                if not results: break
+
+                for item in results:
+                    raw_ts = int(item.get('created_at', 0))
+                    # Если дошли до данных старее, чем нам нужно — стоп
+                    if raw_ts < start_ts_ms:
+                        return all_history 
+
+                    ts = datetime.fromtimestamp(raw_ts / 1000.0, tz=timezone.utc)
+                    # Округляем до часа
+                    floored = ts.replace(minute=0, second=0, microsecond=0)
+                    floored_ts = int(floored.timestamp())
+
+                    if floored_ts not in seen_floored:
+                        raw_val = Decimal(str(item.get('funding_rate', 0)))
+                        # Конвертация в 1h ставку (Paradex обычно дает 8h или абсолют)
+                        rate_1h = raw_val / Decimal('8')
+                        
+                        all_history.append({
+                            'timestamp': floored,
+                            'rate': rate_1h,
+                            'period_hours': 1
+                        })
+                        seen_floored.add(floored_ts)
+
+                cursor = data.get('next')
+                if not cursor: break
+                
+                time.sleep(0.2) # Пауза, чтобы Windows/Paradex не обрывали соединение
+            except Exception as e:
+                print(f"Loop error for {market}: {e}")
+                break
+
+        return all_history

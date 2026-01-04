@@ -1,4 +1,3 @@
-# base.py
 import logging
 import requests
 from abc import ABC, abstractmethod

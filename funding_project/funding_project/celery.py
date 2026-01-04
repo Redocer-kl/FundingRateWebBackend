@@ -25,7 +25,7 @@ def run_tasks_on_startup(sender, **kwargs):
     from scanner.tasks import scan_exchange_task 
     
     # Список бирж, которые нужно запустить сразу
-    exchanges_to_run = ['EdgeX','Hyperliquid', 'Bitget'] #  'Apex', 'Paradex',  'Lighter'
+    exchanges_to_run = ['Paradex',  'Hyperliquid', 'Bitget'] #  'Apex',  'Lighter''EdgeX',
     
     for ex_name in exchanges_to_run:
         scan_exchange_task.delay(ex_name)
