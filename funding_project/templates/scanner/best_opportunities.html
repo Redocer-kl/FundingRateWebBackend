@@ -1,0 +1,114 @@
+{% extends 'scanner/base.html' %}
+{% load custom_filters %}
+
+{% block content %}
+<div class="scanner-card">
+    <ul class="nav nav-tabs border-secondary mb-4">
+        <li class="nav-item">
+            <a class="nav-link text-muted border-secondary" href="{% url 'funding_table' %}?period={{ current_period }}">
+                <i class="bi bi-table me-1"></i> Таблица спредов
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link active bg-warning text-dark border-warning fw-bold" href="#">
+                <i class="bi bi-fire me-1"></i> Лучшие связки
+            </a>
+        </li>
+    </ul>
+
+    <form method="GET" class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="text-white">🔥 Лучшие связки</h4>
+            <div class="d-flex gap-2">
+                <input type="text" name="q" value="{{ search_query }}" 
+                       class="form-control form-control-sm bg-dark text-white border-secondary" 
+                       placeholder="Поиск..." style="width: 200px;">
+                <button type="submit" class="btn btn-sm btn-warning px-3">Найти</button>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="text-muted small d-block mb-2">ПЕРИОД:</label>
+                <div class="d-flex gap-1">
+                    {% for p in '1d,3d,7d,14d,30d'|split:',' %}
+                        <input type="radio" class="btn-check" name="period" id="p_{{p}}" value="{{p}}" 
+                               {% if current_period == p %}checked{% endif %} onchange="this.form.submit()">
+                        <label class="period-btn btn-sm" for="p_{{p}}" style="padding: 4px 12px; cursor: pointer;">{{p}}</label>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-md-6 text-end">
+                <label class="text-muted small d-block mb-2 text-md-end text-start">НАПРАВЛЕНИЕ:</label>
+                <div class="btn-group shadow-sm">
+                    <input type="radio" class="btn-check" name="side" id="side_all" value="ALL" {% if current_side == 'ALL' %}checked{% endif %} onchange="this.form.submit()">
+                    <label class="btn btn-sm btn-outline-secondary" for="side_all">Все</label>
+                    
+                    <input type="radio" class="btn-check" name="side" id="side_long" value="LONG" {% if current_side == 'LONG' %}checked{% endif %} onchange="this.form.submit()">
+                    <label class="btn btn-sm btn-outline-secondary" for="side_long">LONG</label>
+                    
+                    <input type="radio" class="btn-check" name="side" id="side_short" value="SHORT" {% if current_side == 'SHORT' %}checked{% endif %} onchange="this.form.submit()">
+                    <label class="btn btn-sm btn-outline-secondary" for="side_short">SHORT</label>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+        {% for opp in page_obj %}
+        <div class="col">
+            <div class="card h-100 bg-dark border-secondary shadow-sm">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h4 class="text-white fw-bold mb-0"># {{ opp.symbol }}</h4>
+                            <span class="text-muted small">{{ opp.exchange }}</span>
+                        </div>
+                        <span class="badge" style="background-color: {{ opp.color }}; padding: 6px 10px;">
+                            {{ opp.side }}
+                        </span>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between align-items-center bg-black bg-opacity-25 p-3 rounded">
+                        <div>
+                            <div class="text-muted-custom" style="font-size: 0.75rem;">Средний APR ({{ current_period }})</div>
+                            <div class="h3 mb-0 fw-bold" style="color: {{ opp.color }}">{{ opp.apr|floatformat:2 }}%</div>
+                        </div>
+                        <div class="text-end">
+                            <div class="text-muted-custom" style="font-size: 0.75rem;">Цена</div>
+                            <div class="text-white fw-medium">${{ opp.price|floatformat:4 }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer border-secondary bg-transparent p-3">
+                    <a href="{% url 'coin_detail' opp.symbol %}" class="btn btn-sm btn-outline-warning w-100">История ставок ↗</a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center py-5">
+            <h5 class="text-muted">Нет данных для отображения</h5>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="mt-5">
+        <ul class="pagination justify-content-center">
+            {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                    <li class="page-item active"><span class="page-link bg-warning border-warning text-dark">{{ num }}</span></li>
+                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                    <li class="page-item">
+                        <a class="page-link bg-dark border-secondary text-white" 
+                           href="?page={{ num }}&period={{ current_period }}&side={{ current_side }}{% if search_query %}&q={{ search_query }}{% endif %}{% for ex in selected_exchanges %}&exchanges={{ ex }}{% endfor %}">
+                           {{ num }}
+                        </a>
+                    </li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

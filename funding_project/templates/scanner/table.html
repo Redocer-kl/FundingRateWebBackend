@@ -3,33 +3,75 @@
 
 {% block content %}
 <div class="scanner-card">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h4 class="text-white mb-1">Сканер Фандинга</h4>
-            <span class="text-muted-custom">История ставок и лучшие спреды для арбитража (период: {{ current_period }})</span>
-        </div>
-        <div class="d-flex gap-2">
-            <form method="GET" class="d-flex gap-2">
-                <input type="hidden" name="period" value="{{ current_period }}">
+    <ul class="nav nav-tabs border-secondary mb-4">
+    <li class="nav-item">
+        <a class="nav-link active bg-warning text-dark border-warning fw-bold" href="#">
+            <i class="bi bi-table me-1"></i> Таблица спредов
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link text-muted border-secondary" href="{% url 'best_opportunities' %}?period={{ current_period }}">
+            <i class="bi bi-fire me-1"></i> Лучшие связки
+        </a>
+    </li>
+</ul>
+
+
+    <form method="GET" id="filter-form">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h4 class="text-white mb-1">Сканер Фандинга</h4>
+                <span class="text-muted-custom">Лучшие спреды (период: {{ current_period }})</span>
+            </div>
+            
+            <div class="d-flex gap-2">
                 <input type="text" name="q" value="{{ search_query|default:'' }}" 
                        class="form-control form-control-sm bg-dark text-white border-secondary" 
                        placeholder="Поиск монеты..." style="width: 180px;">
                 <button type="submit" class="btn btn-sm btn-warning">Найти</button>
-                {% if search_query %}
-                    <a href="?period={{ current_period }}" class="btn btn-sm btn-outline-secondary">Сброс</a>
-                {% endif %}
-            </form>
-            <a href="/" class="btn btn-sm btn-outline-secondary">Обновить</a>
+                <a href="/" class="btn btn-sm btn-outline-secondary">Сброс</a>
+            </div>
         </div>
-    </div>
-    
-    <div class="mb-4 d-flex align-items-center flex-wrap">
-        <span class="text-white me-3 fw-bold">ПЕРИОД:</span>
-        {% for p in '1d,3d,7d,14d,30d'|split:',' %}
-        <a href="?period={{ p }}{% if search_query %}&q={{ search_query }}{% endif %}" 
-           class="period-btn {% if current_period == p %}active{% endif %}">{{ p }}</a>
-        {% endfor %}
-    </div>
+
+        
+
+        <div class="row g-3 mb-4 align-items-end">
+            <div class="col-md-4">
+                <label class="text-muted small d-block mb-2">ПЕРИОД АНАЛИЗА:</label>
+                <div class="d-flex gap-1">
+                    {% for p in '1d,3d,7d,14d,30d'|split:',' %}
+                        <input type="radio" class="btn-check" name="period" id="p_{{p}}" value="{{p}}" 
+                               {% if current_period == p %}checked{% endif %} onchange="this.form.submit()">
+                        <label class="period-btn btn-sm" for="p_{{p}}" style="padding: 4px 10px; cursor: pointer;">{{p}}</label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="col-md-5">
+                <label class="text-muted small d-block mb-2">БИРЖИ:</label>
+                <div class="d-flex flex-wrap gap-3">
+                    {% for exch in all_exchanges %}
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="exchanges" value="{{ exch.id }}" 
+                               id="ex_{{ exch.id }}" {% if exch.id in selected_exchanges %}checked{% endif %}
+                               onchange="this.form.submit()">
+                        <label class="form-check-label text-white small" for="ex_{{ exch.id }}">
+                            {{ exch.name }}
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <label class="text-muted small d-block mb-2">СОРТИРОВКА:</label>
+                <select name="sort" class="form-select form-select-sm bg-dark text-white border-secondary" onchange="this.form.submit()">
+                    <option value="spread" {% if current_sort == 'spread' %}selected{% endif %}>По размеру спреда</option>
+                    <option value="symbol" {% if current_sort == 'symbol' %}selected{% endif %}>По алфавиту (A-Z)</option>
+                </select>
+            </div>
+        </div>
+    </form>
 
     <div class="table-responsive">
         <table class="table-custom">
@@ -39,7 +81,7 @@
                     <th class="text-end">Текущий %</th>
                     <th class="text-end">Цена</th>
                     <th class="text-end">Текущий APR</th>
-                    <th class="text-end" style="background-color: #2b313930;">Средний %</th>
+                    <th class="text-end" style="background-color: #2b313930;">Средний % ({{ current_period }})</th>
                     <th class="text-end" style="background-color: #2b313930;">Средний APR</th>
                     <th class="text-center">Направление</th>
                     <th class="text-center">Выплат/день</th>
@@ -51,7 +93,7 @@
                         <td colspan="4" class="coin-header">
                             <a href="{% url 'coin_detail' symbol %}" class="text-decoration-none" style="color: #f0b90b;">
                                 <strong># {{ symbol }}</strong>
-                                <small class="text-muted ms-2" style="font-size: 0.7rem;">(График ↗)</small>
+                                <small class="text-muted ms-2" style="font-size: 0.7rem;">(История ↗)</small>
                             </a>
                         </td>
                         <td colspan="4" class="text-end coin-header">
@@ -91,31 +133,32 @@
                         <td class="text-center text-white">{{ row.payouts }}</td>
                     </tr>
                     {% endfor %}
+                {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center py-5 text-muted">Монеты не найдены по выбранным фильтрам</td>
+                    </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-    
+
+    {% if page_obj.paginator.num_pages > 1 %}
     <nav class="mt-4">
         <ul class="pagination justify-content-center">
-            {% if page_obj.has_previous %}
-                <li class="page-item">
-                    <a class="page-link bg-dark border-secondary text-white" 
-                       href="?period={{ current_period }}&page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">Назад</a>
-                </li>
-            {% endif %}
-            <li class="page-item active">
-                <span class="page-link bg-secondary border-secondary text-white">
-                    Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}
-                </span>
-            </li>
-            {% if page_obj.has_next %}
-                <li class="page-item">
-                    <a class="page-link bg-dark border-secondary text-white" 
-                       href="?period={{ current_period }}&page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">Вперед</a>
-                </li>
-            {% endif %}
+            {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                    <li class="page-item active"><span class="page-link bg-warning border-warning text-dark">{{ num }}</span></li>
+                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                    <li class="page-item">
+                        <a class="page-link bg-dark border-secondary text-white" 
+                           href="?page={{ num }}&period={{ current_period }}&sort={{ current_sort }}{% for ex in selected_exchanges %}&exchanges={{ ex }}{% endfor %}{% if search_query %}&q={{ search_query }}{% endif %}">
+                           {{ num }}
+                        </a>
+                    </li>
+                {% endif %}
+            {% endfor %}
         </ul>
     </nav>
+    {% endif %}
 </div>
 {% endblock %}

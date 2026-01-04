@@ -1,0 +1,87 @@
+{% extends 'scanner/base.html' %}
+{% load custom_filters %}
+{% block content %}
+<div class="container py-5">
+    <div class="text-center mb-5">
+        <h1 class="display-4 text-white fw-bold">Funding <span class="text-warning">Scanner</span></h1>
+        <p class="lead text-muted">Профессиональный инструмент для поиска арбитражных возможностей и анализа ставок финансирования.</p>
+        {% if stats.last_update %}
+            <div class="badge bg-dark border border-secondary p-2">
+                <span class="text-success">●</span> Последнее обновление: {{ stats.last_update.timestamp|date:"H:i" }} UTC
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="row g-4 mb-5 text-center">
+        <div class="col-md-4">
+            <div class="bg-dark p-4 rounded-3 border border-secondary h-100">
+                <h3 class="text-warning mb-0">{{ stats.total_coins }}</h3>
+                <span class="text-muted small">Монет в базе</span>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="bg-dark p-4 rounded-3 border border-secondary h-100">
+                <h3 class="text-warning mb-0">{{ stats.total_exchanges }}</h3>
+                <span class="text-muted small">Подключенных бирж</span>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="bg-dark p-4 rounded-3 border border-secondary h-100">
+                <h3 class="text-warning mb-0">30 дней</h3>
+                <span class="text-muted small">Глубина истории</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card bg-dark border-secondary h-100 hover-shadow" style="transition: 0.3s;">
+                <div class="card-body p-4">
+                    <div class="mb-3 text-warning">
+                        <i class="bi bi-grid-3x3-gap-fill" style="font-size: 2rem;"></i>
+                    </div>
+                    <h3 class="card-title text-white">Таблица Спредов</h3>
+                    <p class="card-text text-muted">Полный список всех монет с расчетом разницы APR между биржами. Идеально для Delta-Neutral стратегий.</p>
+                    <a href="{% url 'funding_table' %}" class="btn btn-warning w-100 fw-bold">Открыть таблицу</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card bg-dark border-secondary h-100 hover-shadow" style="transition: 0.3s;">
+                <div class="card-body p-4">
+                    <div class="mb-3 text-success">
+                        <i class="bi bi-graph-up-arrow" style="font-size: 2rem;"></i>
+                    </div>
+                    <h3 class="card-title text-white">Лучшие связки/h3>
+                    <p class="card-text text-muted">Топ самых высоких ставок по отдельным биржам. Найдите, где платят больше всего за лонг или шорт.</p>
+                    <a href="{% url 'best_opportunities' %}" class="btn btn-outline-success w-100 fw-bold">Смотреть топ</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-5 p-4 rounded-3" style="background: #1e2329;">
+        <h5 class="text-white mb-3">Как это работает?</h5>
+        <div class="row text-muted small">
+            <div class="col-md-4">
+                <p><strong>1. Сбор данных:</strong> Наш сканер каждые несколько часов опрашивает API Hyperliquid, Bitget и Paradex.</p>
+            </div>
+            <div class="col-md-4">
+                <p><strong>2. Анализ APR:</strong> Мы пересчитываем разовые выплаты в годовой процент (APR) для удобного сравнения.</p>
+            </div>
+            <div class="col-md-4">
+                <p><strong>3. Поиск спредов:</strong> Система находит разницу в ставках между биржами на одной и той же монете.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .hover-shadow:hover {
+        transform: translateY(-5px);
+        border-color: #f0b90b !important;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+    }
+</style>
+{% endblock %}

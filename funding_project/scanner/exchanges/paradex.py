@@ -35,61 +35,73 @@ class ParadexScanner(BaseScanner):
             print(f"Paradex fetch_tickers error: {e}")
             return []
 
-    def fetch_funding_history(self, market, lookback_days=30, sample_minutes=60):
+    def fetch_funding_history(self, market, lookback_days=30, sample_minutes=None):
         all_history = []
         now = datetime.now(tz=timezone.utc)
-        start_dt = now - timedelta(days=lookback_days)
-        start_ts_ms = int(start_dt.timestamp() * 1000)
         
-        url = f"{self.BASE_URL}/v1/funding/data"
-        params = {
-            'market': market,
-            'page_size': 100  # Максимально допустимый размер
-        }
-        
-        seen_floored = set()
-        cursor = None
-        # Увеличиваем лимит итераций, чтобы уйти глубже в историю
-        for _ in range(300): 
-            if cursor:
-                params['cursor'] = cursor
+        # Вычисляем общее количество прыжков (3 раза в день * кол-во дней)
+        # 30 дней * 3 = 90 запросов на одну монету
+        total_jumps = lookback_days * 3
+        hours_step = 8 
+
+        seen_timestamps = set()
+
+        for jump in range(total_jumps):
+            # Вычисляем время для текущего прыжка (идем назад от 'now')
+            target_date = now - timedelta(hours=jump * hours_step)
+            end_at_ms = int(target_date.timestamp() * 1000)
+            
+            url = f"{self.BASE_URL}/v1/funding/data"
+            params = {
+                'market': market,
+                'page_size': 1,  # Нам нужна только одна ближайшая запись к этому времени
+                'end_at': end_at_ms
+            }
 
             try:
                 data = self._get(url, params=params)
-                if not data or not isinstance(data, dict): break
+                if not data or not isinstance(data, dict):
+                    continue
                 
                 results = data.get('results', [])
-                if not results: break
+                if not results:
+                    # Если данных нет совсем глубоко в истории, можно прервать цикл раньше
+                    if jump > 10: # Небольшой запас
+                        break
+                    continue
 
-                for item in results:
-                    raw_ts = int(item.get('created_at', 0))
-                    # Если дошли до данных старее, чем нам нужно — стоп
-                    if raw_ts < start_ts_ms:
-                        return all_history 
-
-                    ts = datetime.fromtimestamp(raw_ts / 1000.0, tz=timezone.utc)
-                    # Округляем до часа
-                    floored = ts.replace(minute=0, second=0, microsecond=0)
-                    floored_ts = int(floored.timestamp())
-
-                    if floored_ts not in seen_floored:
-                        raw_val = Decimal(str(item.get('funding_rate', 0)))
-                        # Конвертация в 1h ставку (Paradex обычно дает 8h или абсолют)
-                        rate_1h = raw_val / Decimal('8')
-                        
-                        all_history.append({
-                            'timestamp': floored,
-                            'rate': rate_1h,
-                            'period_hours': 1
-                        })
-                        seen_floored.add(floored_ts)
-
-                cursor = data.get('next')
-                if not cursor: break
+                item = results[0]
+                raw_ts = int(item.get('created_at', 0))
+                ts = datetime.fromtimestamp(raw_ts / 1000.0, tz=timezone.utc)
                 
-                time.sleep(0.2) # Пауза, чтобы Windows/Paradex не обрывали соединение
-            except Exception as e:
-                print(f"Loop error for {market}: {e}")
-                break
+                # Округляем до часа для базы данных
+                floored = ts.replace(minute=0, second=0, microsecond=0)
+                floored_ts = int(floored.timestamp())
 
+                # Проверяем, не сохраняли ли мы уже эту точку (чтобы не дублировать)
+                if floored_ts not in seen_timestamps:
+                    raw_val = Decimal(str(item.get('funding_rate', 0)))
+                    # Paradex ставка за 8ч, делим на 8 для получения часовой ставки (для APR)
+                    rate_1h = raw_val / Decimal('8')
+
+                    all_history.append({
+                        'timestamp': floored,
+                        'rate': rate_1h,
+                        'period_hours': 1
+                    })
+                    seen_timestamps.add(floored_ts)
+                
+                # Логируем раз в день (каждый 3-й прыжок), чтобы не спамить в консоль
+                if jump % 3 == 0:
+                    print(f"Paradex [{market}]: Сбор данных за {ts.strftime('%Y-%m-%d %H:%M')}")
+                
+                # Небольшая пауза, чтобы избежать Rate Limit (особенно важно при 90 запросах на монету)
+                time.sleep(0.05)
+
+            except Exception as e:
+                print(f"Paradex jump error at {target_date}: {e}")
+                continue
+
+        # Сортируем от старых к новым перед возвратом
+        all_history.sort(key=lambda x: x['timestamp'])
         return all_history

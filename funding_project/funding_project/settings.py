@@ -130,35 +130,23 @@ CELERY_TIMEZONE = "UTC"
 from celery.schedules import crontab
 
 CELERY_BEAT_SCHEDULE = {
-    # 'scan-hyperliquid': {
-    #     'task': 'scanner.tasks.scan_exchange_task',
-    #     'schedule': crontab(minute='*/10'),
-    #     'args': ('Hyperliquid',), # Передаем имя как аргумент
-    # },
-    # 'scan-bitget': {
-    #     'task': 'scanner.tasks.scan_exchange_task',
-    #     'schedule': crontab(minute='*/15'),
-    #     'args': ('Bitget',),
-    # },
-    # 'scan-apex': {
-    #     'task': 'scanner.tasks.scan_exchange_task',
-    #     'schedule': crontab(minute='*/20'),
-    #     'args': ('Apex',),
-    # },
-     'scan-paradex': {
+    # Hyperliquid активная биржа, меняется часто. 
+    # Запускаем каждые 20 минут.
+    'scan-hyperliquid': {
         'task': 'scanner.tasks.scan_exchange_task',
-        'schedule': crontab(minute='*/30'),
+        'schedule': crontab(minute='1,21,41'), 
+        'args': ('Hyperliquid',),
+    },
+    # Bitget платит каждые 8 часов (00:00, 08:00, 16:00).
+    # Нет смысла дергать его историю чаще раза в час.
+    'scan-bitget': {
+        'task': 'scanner.tasks.scan_exchange_task',
+        'schedule': crontab(minute='5'), # В 5 минут каждого часа
+        'args': ('Bitget',),
+    },
+    'scan-paradex': {
+        'task': 'scanner.tasks.scan_exchange_task',
+        'schedule': crontab(minute='10'), # В 10 минут каждого часа
         'args': ('Paradex',),
     },
-    # 'scan-edgex': {
-    #     'task': 'scanner.tasks.scan_exchange_task',
-    #     'schedule': crontab(minute='*/30'),
-    #     'args': ('EdgeX',),
-    # },
-    # 'scan-paradex': {
-    #     'task': 'scanner.tasks.scan_exchange_task',
-    #     'schedule': crontab(minute='*/30'),
-    #     'args': ('Lighter',),
-    # },
-    
 }
