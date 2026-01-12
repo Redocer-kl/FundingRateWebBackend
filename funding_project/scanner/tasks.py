@@ -31,16 +31,21 @@ def scan_exchange_task(exchange_name):
     processed_count = 0
     
     for item in market_data:
+        original_symbol = item.get('original_symbol', item['symbol'])
+        
         ticker, _ = Ticker.objects.update_or_create(
             exchange=exchange_obj,
             symbol=item['symbol'],
-            defaults={'last_price': item['price']}
+            defaults={
+                'last_price': item['price'],
+                'original_symbol': original_symbol 
+            }
         )
         
         last_entry = FundingRate.objects.filter(ticker=ticker).order_by('-timestamp').first()
         lookback = 1 if last_entry else 30
         
-        history = scanner.fetch_funding_history(item.get('original_symbol', item['symbol']), lookback_days=lookback)
+        history = scanner.fetch_funding_history(original_symbol, lookback_days=lookback)
         
         existing_ts = set(FundingRate.objects.filter(
             ticker=ticker, 
@@ -58,7 +63,6 @@ def scan_exchange_task(exchange_name):
             # Стандартная формула APR
             apr_val = rate * (Decimal('24') / period) * Decimal('365') * Decimal('100')
             
-            # Технический фильтр от мусора
             if abs(apr_val) > Decimal('2000'):
                 continue
 
@@ -75,6 +79,21 @@ def scan_exchange_task(exchange_name):
             FundingRate.objects.bulk_create(new_records, ignore_conflicts=True)
             processed_count += len(new_records)
         
-        time.sleep(0.05) # Небольшая пауза
+        if exchange_name == 'Paradex':
+            time.sleep(0.5) 
+        else:
+            time.sleep(0.1)
             
     return f"{exchange_name}: Успешно обновлено {processed_count} записей"
+
+@shared_task
+def cleanup_old_data_task(days=30):
+    """
+    Удаляет записи фандинга старше указанного количества дней.
+    """
+    cutoff_date = timezone.now() - timedelta(days=days)
+    
+    deleted_count, _ = FundingRate.objects.filter(timestamp__lt=cutoff_date).delete()
+    
+    print(f"CLEANUP: Удалено {deleted_count} устаревших записей (старше {days} дней).")
+    return deleted_count

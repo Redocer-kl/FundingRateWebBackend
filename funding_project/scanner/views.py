@@ -3,15 +3,14 @@ from django.db.models import Avg, Max, Min
 from django.utils import timezone
 from datetime import timedelta
 from django.core.paginator import Paginator
-from .models import Ticker, FundingRate, Exchange # Добавьте Exchange в импорт
+from .models import Ticker, FundingRate, Exchange 
 
 def funding_table(request):
-    # 1. Получаем параметры из URL
     period_param = request.GET.get('period', '1d')
     page_number = request.GET.get('page', 1)
     search_query = request.GET.get('q', '').strip().upper()
-    sort_by = request.GET.get('sort', 'spread')  # spread или symbol
-    selected_exchanges = request.GET.getlist('exchanges') # Список выбранных ID бирж
+    sort_by = request.GET.get('sort', 'spread')  
+    selected_exchanges = request.GET.getlist('exchanges') 
 
     # 2. Подготовка базовых данных
     days_map = {'1d': 1, '3d': 3, '7d': 7, '14d': 14, '30d': 30}
@@ -42,7 +41,7 @@ def funding_table(request):
         history_stats = ticker.funding_rates.filter(
             timestamp__gte=time_threshold
         ).aggregate(avg_apr=Avg('apr'), avg_rate=Avg('rate'))
-        
+         
         avg_apr = history_stats['avg_apr'] or 0
         
         row_data = {

@@ -35,53 +35,37 @@ class ParadexScanner(BaseScanner):
             print(f"Paradex fetch_tickers error: {e}")
             return []
 
-    def fetch_funding_history(self, market, lookback_days=30, sample_minutes=None):
+    def fetch_funding_history(self, market, lookback_days=30):
         all_history = []
-        now = datetime.now(tz=timezone.utc)
+        # Вычисляем время начала
+        start_at = int((datetime.now(tz=timezone.utc) - timedelta(days=lookback_days)).timestamp() * 1000)
         
-        # Вычисляем общее количество прыжков (3 раза в день * кол-во дней)
-        # 30 дней * 3 = 90 запросов на одну монету
-        total_jumps = lookback_days * 3
-        hours_step = 8 
+        url = f"{self.BASE_URL}/v1/funding/data"
+        params = {
+            'market': market,
+            'page_size': 100,  # Берем сразу пачку данных
+            'start_at': start_at # Идем от прошлого к настоящему
+        }
 
-        seen_timestamps = set()
-
-        for jump in range(total_jumps):
-            # Вычисляем время для текущего прыжка (идем назад от 'now')
-            target_date = now - timedelta(hours=jump * hours_step)
-            end_at_ms = int(target_date.timestamp() * 1000)
+        try:
+            data = self._get(url, params=params)
+            if not data or not isinstance(data, dict):
+                return []
             
-            url = f"{self.BASE_URL}/v1/funding/data"
-            params = {
-                'market': market,
-                'page_size': 1,  # Нам нужна только одна ближайшая запись к этому времени
-                'end_at': end_at_ms
-            }
+            results = data.get('results', [])
+            seen_hours = set()
 
-            try:
-                data = self._get(url, params=params)
-                if not data or not isinstance(data, dict):
-                    continue
-                
-                results = data.get('results', [])
-                if not results:
-                    # Если данных нет совсем глубоко в истории, можно прервать цикл раньше
-                    if jump > 10: # Небольшой запас
-                        break
-                    continue
-
-                item = results[0]
+            for item in results:
                 raw_ts = int(item.get('created_at', 0))
                 ts = datetime.fromtimestamp(raw_ts / 1000.0, tz=timezone.utc)
                 
-                # Округляем до часа для базы данных
+                # Округляем до часа
                 floored = ts.replace(minute=0, second=0, microsecond=0)
                 floored_ts = int(floored.timestamp())
 
-                # Проверяем, не сохраняли ли мы уже эту точку (чтобы не дублировать)
-                if floored_ts not in seen_timestamps:
+                if floored_ts not in seen_hours:
                     raw_val = Decimal(str(item.get('funding_rate', 0)))
-                    # Paradex ставка за 8ч, делим на 8 для получения часовой ставки (для APR)
+                    # Paradex ставка за 8ч, нормализуем к 1ч
                     rate_1h = raw_val / Decimal('8')
 
                     all_history.append({
@@ -89,19 +73,12 @@ class ParadexScanner(BaseScanner):
                         'rate': rate_1h,
                         'period_hours': 1
                     })
-                    seen_timestamps.add(floored_ts)
-                
-                # Логируем раз в день (каждый 3-й прыжок), чтобы не спамить в консоль
-                if jump % 3 == 0:
-                    print(f"Paradex [{market}]: Сбор данных за {ts.strftime('%Y-%m-%d %H:%M')}")
-                
-                # Небольшая пауза, чтобы избежать Rate Limit (особенно важно при 90 запросах на монету)
-                time.sleep(0.05)
+                    seen_hours.add(floored_ts)
 
-            except Exception as e:
-                print(f"Paradex jump error at {target_date}: {e}")
-                continue
+            # Добавляем небольшую паузу после запроса всей пачки
+            time.sleep(0.2)
 
-        # Сортируем от старых к новым перед возвратом
-        all_history.sort(key=lambda x: x['timestamp'])
+        except Exception as e:
+            print(f"Paradex fetch history error for {market}: {e}")
+
         return all_history

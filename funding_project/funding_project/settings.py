@@ -112,13 +112,7 @@ USE_I18N = True
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
-
 STATIC_URL = 'static/'
-
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -126,19 +120,14 @@ CELERY_BROKER_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 CELERY_TIMEZONE = "UTC" 
 
-# Настройки периодических задач (Celery Beat)
 from celery.schedules import crontab
 
 CELERY_BEAT_SCHEDULE = {
-    # Hyperliquid активная биржа, меняется часто. 
-    # Запускаем каждые 20 минут.
     'scan-hyperliquid': {
         'task': 'scanner.tasks.scan_exchange_task',
         'schedule': crontab(minute='1,21,41'), 
         'args': ('Hyperliquid',),
     },
-    # Bitget платит каждые 8 часов (00:00, 08:00, 16:00).
-    # Нет смысла дергать его историю чаще раза в час.
     'scan-bitget': {
         'task': 'scanner.tasks.scan_exchange_task',
         'schedule': crontab(minute='5'), # В 5 минут каждого часа
@@ -148,5 +137,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'scanner.tasks.scan_exchange_task',
         'schedule': crontab(minute='10'), # В 10 минут каждого часа
         'args': ('Paradex',),
+    },
+    'cleanup-old-data': {
+        'task': 'scanner.tasks.cleanup_old_data_task',
+        'schedule': crontab(hour=4, minute=0),
+        'args': (30,), # Храним 30 дней
     },
 }
