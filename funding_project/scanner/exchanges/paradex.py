@@ -37,14 +37,13 @@ class ParadexScanner(BaseScanner):
 
     def fetch_funding_history(self, market, lookback_days=30):
         all_history = []
-        # Вычисляем время начала
         start_at = int((datetime.now(tz=timezone.utc) - timedelta(days=lookback_days)).timestamp() * 1000)
         
         url = f"{self.BASE_URL}/v1/funding/data"
         params = {
             'market': market,
-            'page_size': 100,  # Берем сразу пачку данных
-            'start_at': start_at # Идем от прошлого к настоящему
+            'page_size': 100, 
+            'start_at': start_at 
         }
 
         try:
@@ -59,13 +58,11 @@ class ParadexScanner(BaseScanner):
                 raw_ts = int(item.get('created_at', 0))
                 ts = datetime.fromtimestamp(raw_ts / 1000.0, tz=timezone.utc)
                 
-                # Округляем до часа
                 floored = ts.replace(minute=0, second=0, microsecond=0)
                 floored_ts = int(floored.timestamp())
 
                 if floored_ts not in seen_hours:
                     raw_val = Decimal(str(item.get('funding_rate', 0)))
-                    # Paradex ставка за 8ч, нормализуем к 1ч
                     rate_1h = raw_val / Decimal('8')
 
                     all_history.append({
@@ -75,7 +72,6 @@ class ParadexScanner(BaseScanner):
                     })
                     seen_hours.add(floored_ts)
 
-            # Добавляем небольшую паузу после запроса всей пачки
             time.sleep(0.2)
 
         except Exception as e:

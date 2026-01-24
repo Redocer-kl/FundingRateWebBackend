@@ -3,6 +3,7 @@ from .models import Exchange, Ticker, FundingRate
 from django.utils import timezone
 from datetime import timedelta
 from decimal import Decimal, getcontext
+from scanner.services.coingecko import CoinGeckoService
 import time
 
 getcontext().prec = 28
@@ -10,11 +11,19 @@ getcontext().prec = 28
 from .exchanges.bitget import BitgetScanner
 from .exchanges.hyperliquid import HyperliquidScanner
 from .exchanges.paradex import ParadexScanner
+from .exchanges.binance import BinanceScanner
+from .exchanges.kucoin import KucoinScanner
+from .exchanges.apex import ApexScanner
+from .exchanges.coinex import CoinexScanner
 
 SCANNERS = {
     'Bitget': BitgetScanner,
     'Hyperliquid': HyperliquidScanner,
     'Paradex': ParadexScanner,
+    'Binance': BinanceScanner,
+    'Apex': ApexScanner,
+    'Kucoin': KucoinScanner,
+    'CoinEx': CoinexScanner,
 }
 
 @shared_task
@@ -60,7 +69,6 @@ def scan_exchange_task(exchange_name):
             rate = Decimal(str(row['rate']))
             period = Decimal(str(row.get('period_hours', 1)))
             
-            # Стандартная формула APR
             apr_val = rate * (Decimal('24') / period) * Decimal('365') * Decimal('100')
             
             if abs(apr_val) > Decimal('2000'):
@@ -88,12 +96,16 @@ def scan_exchange_task(exchange_name):
 
 @shared_task
 def cleanup_old_data_task(days=30):
-    """
-    Удаляет записи фандинга старше указанного количества дней.
-    """
     cutoff_date = timezone.now() - timedelta(days=days)
     
     deleted_count, _ = FundingRate.objects.filter(timestamp__lt=cutoff_date).delete()
     
     print(f"CLEANUP: Удалено {deleted_count} устаревших записей (старше {days} дней).")
     return deleted_count
+
+
+@shared_task
+def update_coingecko_data_task():
+    service = CoinGeckoService()
+    result = service.update_market_data()
+    return result

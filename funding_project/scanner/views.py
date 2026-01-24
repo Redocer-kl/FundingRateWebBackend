@@ -1,9 +1,9 @@
-from django.shortcuts import render
-from django.db.models import Avg, Max, Min
+from django.shortcuts import render, get_object_or_404
+from django.db.models import Avg, Max
 from django.utils import timezone
 from datetime import timedelta
 from django.core.paginator import Paginator
-from .models import Ticker, FundingRate, Exchange 
+from .models import Ticker, Exchange, Asset, FundingRate
 
 def funding_table(request):
     period_param = request.GET.get('period', '1d')
@@ -12,16 +12,13 @@ def funding_table(request):
     sort_by = request.GET.get('sort', 'spread')  
     selected_exchanges = request.GET.getlist('exchanges') 
 
-    # 2. Подготовка базовых данных
     days_map = {'1d': 1, '3d': 3, '7d': 7, '14d': 14, '30d': 30}
     days = days_map.get(period_param, 1)
     time_threshold = timezone.now() - timedelta(days=days)
     
-    # Все биржи для фильтра в шаблоне
     all_exchanges = Exchange.objects.all()
 
-    # 3. Фильтрация тикеров
-    tickers = Ticker.objects.all().select_related('exchange').prefetch_related('funding_rates')
+    tickers = Ticker.objects.all().select_related('exchange', 'asset').prefetch_related('funding_rates')
     
     if search_query:
         tickers = tickers.filter(symbol__icontains=search_query)
@@ -29,12 +26,22 @@ def funding_table(request):
     if selected_exchanges:
         tickers = tickers.filter(exchange_id__in=selected_exchanges)
 
-    # 4. Группировка данных
     grouped_data = {}
     symbol_spreads = {}
+    symbol_assets = {} 
+    symbol_max_apr = {} 
 
     for ticker in tickers:
         symbol = ticker.symbol
+        
+        if symbol not in symbol_assets and ticker.asset:
+            symbol_assets[symbol] = {
+                'image': ticker.asset.image_url,
+                'market_cap': ticker.asset.market_cap or 0,
+                'volume': ticker.asset.volume_24h or 0,
+                'asset_symbol': ticker.asset.symbol 
+            }
+
         latest_funding = ticker.funding_rates.order_by('-timestamp').first()
         if not latest_funding: continue
 
@@ -59,31 +66,38 @@ def funding_table(request):
             grouped_data[symbol] = []
         grouped_data[symbol].append(row_data)
 
-    # 5. Расчет спредов и финальная подготовка списка
     final_symbols = []
     for symbol, rows in grouped_data.items():
         if len(rows) > 1:
             aprs = [r['hist_apr'] for r in rows]
             spread = max(aprs) - min(aprs)
+            max_abs_apr = max([abs(r['hist_apr']) for r in rows])
         else:
             spread = 0
+            max_abs_apr = abs(rows[0]['hist_apr']) if rows else 0
         
         symbol_spreads[symbol] = spread
+        symbol_max_apr[symbol] = max_abs_apr
         final_symbols.append(symbol)
 
-    # 6. Сортировка
     if sort_by == 'symbol':
-        final_symbols.sort() # По алфавиту
+        final_symbols.sort()
+    elif sort_by == 'market_cap':
+        final_symbols.sort(key=lambda s: symbol_assets.get(s, {}).get('market_cap', 0), reverse=True)
+    elif sort_by == 'volume':
+        final_symbols.sort(key=lambda s: symbol_assets.get(s, {}).get('volume', 0), reverse=True)
+    elif sort_by == 'apr':
+        final_symbols.sort(key=lambda s: symbol_max_apr.get(s, 0), reverse=True)
     else:
-        final_symbols.sort(key=lambda s: symbol_spreads.get(s, 0), reverse=True) # По спреду
+        final_symbols.sort(key=lambda s: symbol_spreads.get(s, 0), reverse=True)
 
-    # 7. Пагинация
     paginator = Paginator(final_symbols, 20)
     page_obj = paginator.get_page(page_number)
 
     return render(request, 'scanner/table.html', {
         'grouped_data': grouped_data,
         'symbol_spreads': symbol_spreads,
+        'symbol_assets': symbol_assets, 
         'page_obj': page_obj,
         'current_period': period_param,
         'search_query': search_query,
@@ -92,25 +106,25 @@ def funding_table(request):
         'current_sort': sort_by
     })
 
-import json
-
 def coin_detail(request, symbol):
-    tickers = Ticker.objects.filter(symbol=symbol).select_related('exchange')
+    tickers = Ticker.objects.filter(symbol=symbol).select_related('exchange', 'asset')
     time_threshold = timezone.now() - timedelta(days=30)
     
+    asset_info = None
+    if tickers.exists() and tickers.first().asset:
+        asset_info = tickers.first().asset
+
     datasets = []
     summary_stats = []
-    colors = {'Hyperliquid': '#f0b90b', 'Bitget': '#00f0ff', 'Paradex': '#ff4747'}
+    colors = {'Hyperliquid': '#f0b90b', 'Bitget': '#00f0ff', 'Paradex': '#ff4747', 'Binance': "#f1e21a", 'Kucoin': "#ef14ff"}
 
     for ticker in tickers:
         exch_name = ticker.exchange.name
         rates = ticker.funding_rates.filter(timestamp__gte=time_threshold).order_by('timestamp')
         
-        # Данные для графика
         data_points = [{'x': r.timestamp.isoformat(), 'y': float(r.apr)} for r in rates]
         
-        # Сводная статистика для карточек
-        avg_data = rates.aggregate(avg_apr=Avg('apr'), max_apr=Max('apr'))
+        avg_data = rates.aggregate(avg_apr=Avg('apr'))
         latest = rates.last()
         
         if latest:
@@ -138,6 +152,7 @@ def coin_detail(request, symbol):
 
     return render(request, 'scanner/coin_detail.html', {
         'symbol': symbol,
+        'asset': asset_info, 
         'chart_data': chart_data,
         'summary_stats': summary_stats
     })
@@ -145,7 +160,7 @@ def coin_detail(request, symbol):
 def best_opportunities(request):
     period_param = request.GET.get('period', '1d')
     search_query = request.GET.get('q', '').strip().upper()
-    side_filter = request.GET.get('side', 'ALL') # ALL, LONG, SHORT
+    side_filter = request.GET.get('side', 'ALL') 
     selected_exchanges = request.GET.getlist('exchanges')
 
     days_map = {'1d': 1, '3d': 3, '7d': 7, '14d': 14, '30d': 30}
@@ -164,7 +179,6 @@ def best_opportunities(request):
     opportunities = []
 
     for ticker in tickers:
-        # Считаем среднее за период
         stats = ticker.funding_rates.filter(
             timestamp__gte=time_threshold
         ).aggregate(avg_apr=Avg('apr'))
@@ -172,9 +186,6 @@ def best_opportunities(request):
         avg_apr = stats['avg_apr'] or 0
         if avg_apr == 0: continue
 
-        # Определяем доходную сторону
-        # Если APR > 0, выгодно стоять в SHORT (получаем фандинг)
-        # Если APR < 0, выгодно стоять в LONG (получаем фандинг от шортистов)
         if avg_apr > 0:
             current_side = 'SHORT'
             yield_val = avg_apr
@@ -182,7 +193,6 @@ def best_opportunities(request):
             current_side = 'LONG'
             yield_val = abs(avg_apr)
 
-        # Фильтр по стороне
         if side_filter != 'ALL' and side_filter != current_side:
             continue
 
@@ -195,10 +205,8 @@ def best_opportunities(request):
             'color': '#02c076' if current_side == 'LONG' else '#f84960'
         })
 
-    # Сортировка: самые доходные сверху
     opportunities.sort(key=lambda x: x['apr'], reverse=True)
 
-    # Пагинация
     paginator = Paginator(opportunities, 30)
     page_obj = paginator.get_page(request.GET.get('page', 1))
 
@@ -212,7 +220,6 @@ def best_opportunities(request):
     })
 
 def index(request):
-    # Можно добавить немного живой статистики для красоты
     stats = {
         'total_coins': Ticker.objects.values('symbol').distinct().count(),
         'total_exchanges': Exchange.objects.count(),

@@ -38,6 +38,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize',
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'corsheaders',
     'scanner',
 ]
 
@@ -49,6 +53,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
 ]
 
 ROOT_URLCONF = 'funding_project.urls'
@@ -99,9 +104,13 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+}
 
-# Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
+CORS_ALLOW_ALL_ORIGINS = True
 
 LANGUAGE_CODE = 'en-us'
 
@@ -130,17 +139,36 @@ CELERY_BEAT_SCHEDULE = {
     },
     'scan-bitget': {
         'task': 'scanner.tasks.scan_exchange_task',
-        'schedule': crontab(minute='5'), # В 5 минут каждого часа
+        'schedule': crontab(minute='5'), 
         'args': ('Bitget',),
     },
     'scan-paradex': {
         'task': 'scanner.tasks.scan_exchange_task',
-        'schedule': crontab(minute='10'), # В 10 минут каждого часа
+        'schedule': crontab(minute='10'), 
         'args': ('Paradex',),
+    },
+    'scan-binance': {
+        'task': 'scanner.tasks.scan_exchange_task',
+        'schedule': crontab(minute='20'), 
+        'args': ('Binance',),
+    },
+    'scan-coinex': {
+        'task': 'scanner.tasks.scan_exchange_task',
+        'schedule': crontab(minute='40'), 
+        'args': ('CoinEx',),
+    },
+    'scan-kucoin': {
+        'task': 'scanner.tasks.scan_exchange_task',
+        'schedule': crontab(minute='50'), 
+        'args': ('Kucoin',),
     },
     'cleanup-old-data': {
         'task': 'scanner.tasks.cleanup_old_data_task',
         'schedule': crontab(hour=4, minute=0),
-        'args': (30,), # Храним 30 дней
+        'args': (30,), 
+    },
+    'update-market-data': {
+        'task': 'scanner.tasks.update_coingecko_data_task',
+        'schedule': crontab(minute='15'), 
     },
 }

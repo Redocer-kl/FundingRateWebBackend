@@ -1,43 +1,41 @@
 {% extends 'scanner/base.html' %}
+{% load humanize %} 
 {% load custom_filters %}
 
 {% block content %}
 <div class="scanner-card">
     <ul class="nav nav-tabs border-secondary mb-4">
-    <li class="nav-item">
-        <a class="nav-link active bg-warning text-dark border-warning fw-bold" href="#">
-            <i class="bi bi-table me-1"></i> Таблица спредов
-        </a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link text-muted border-secondary" href="{% url 'best_opportunities' %}?period={{ current_period }}">
-            <i class="bi bi-fire me-1"></i> Лучшие связки
-        </a>
-    </li>
-</ul>
-
+        <li class="nav-item">
+            <a class="nav-link active bg-warning text-dark border-warning fw-bold" href="#">
+                <i class="bi bi-table me-1"></i> Таблица спредов
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link text-muted border-secondary" href="{% url 'best_opportunities' %}?period={{ current_period }}">
+                <i class="bi bi-fire me-1"></i> Лучшие связки
+            </a>
+        </li>
+    </ul>
 
     <form method="GET" id="filter-form">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h4 class="text-white mb-1">Сканер Фандинга</h4>
-                <span class="text-muted-custom">Лучшие спреды (период: {{ current_period }})</span>
+                <span class="text-muted-custom">Период анализа: {{ current_period }}</span>
             </div>
             
             <div class="d-flex gap-2">
                 <input type="text" name="q" value="{{ search_query|default:'' }}" 
                        class="form-control form-control-sm bg-dark text-white border-secondary" 
-                       placeholder="Поиск монеты..." style="width: 180px;">
+                       placeholder="Поиск..." style="width: 180px;">
                 <button type="submit" class="btn btn-sm btn-warning">Найти</button>
                 <a href="/" class="btn btn-sm btn-outline-secondary">Сброс</a>
             </div>
         </div>
 
-        
-
         <div class="row g-3 mb-4 align-items-end">
             <div class="col-md-4">
-                <label class="text-muted small d-block mb-2">ПЕРИОД АНАЛИЗА:</label>
+                <label class="text-muted small d-block mb-2">ПЕРИОД:</label>
                 <div class="d-flex gap-1">
                     {% for p in '1d,3d,7d,14d,30d'|split:',' %}
                         <input type="radio" class="btn-check" name="period" id="p_{{p}}" value="{{p}}" 
@@ -47,7 +45,7 @@
                 </div>
             </div>
 
-            <div class="col-md-5">
+            <div class="col-md-4">
                 <label class="text-muted small d-block mb-2">БИРЖИ:</label>
                 <div class="d-flex flex-wrap gap-3">
                     {% for exch in all_exchanges %}
@@ -63,11 +61,14 @@
                 </div>
             </div>
 
-            <div class="col-md-3">
-                <label class="text-muted small d-block mb-2">СОРТИРОВКА:</label>
+            <div class="col-md-4">
+                <label class="text-muted small d-block mb-2">СОРТИРОВАТЬ ПО:</label>
                 <select name="sort" class="form-select form-select-sm bg-dark text-white border-secondary" onchange="this.form.submit()">
-                    <option value="spread" {% if current_sort == 'spread' %}selected{% endif %}>По размеру спреда</option>
-                    <option value="symbol" {% if current_sort == 'symbol' %}selected{% endif %}>По алфавиту (A-Z)</option>
+                    <option value="spread" {% if current_sort == 'spread' %}selected{% endif %}>Размер спреда</option>
+                    <option value="apr" {% if current_sort == 'apr' %}selected{% endif %}>Макс. APR</option>
+                    <option value="market_cap" {% if current_sort == 'market_cap' %}selected{% endif %}>Market Cap (Размер рынка)</option>
+                    <option value="volume" {% if current_sort == 'volume' %}selected{% endif %}>Volume 24h (Объем)</option>
+                    <option value="symbol" {% if current_sort == 'symbol' %}selected{% endif %}>Алфавит (A-Z)</option>
                 </select>
             </div>
         </div>
@@ -78,64 +79,92 @@
             <thead>
                 <tr>
                     <th>Биржа</th>
-                    <th class="text-end">Текущий %</th>
+                    <th class="text-end">
+                        <a href="?sort=market_cap&period={{current_period}}" class="text-decoration-none text-muted small">
+                            M.Cap {% if current_sort == 'market_cap' %}▼{% endif %}
+                        </a>
+                    </th>
+                    <th class="text-end">
+                        <a href="?sort=volume&period={{current_period}}" class="text-decoration-none text-muted small">
+                            Vol 24h {% if current_sort == 'volume' %}▼{% endif %}
+                        </a>
+                    </th>
+                    
                     <th class="text-end">Цена</th>
-                    <th class="text-end">Текущий APR</th>
-                    <th class="text-end" style="background-color: #2b313930;">Средний % ({{ current_period }})</th>
-                    <th class="text-end" style="background-color: #2b313930;">Средний APR</th>
+                    <th class="text-end" style="background-color: #2b313930;">
+                        <a href="?sort=apr&period={{current_period}}" class="text-decoration-none text-muted small">
+                            Avg APR {% if current_sort == 'apr' %}▼{% endif %}
+                        </a>
+                    </th>
                     <th class="text-center">Направление</th>
-                    <th class="text-center">Выплат/день</th>
+                    <th class="text-center">Выплат</th>
                 </tr>
             </thead>
             <tbody>
                 {% for symbol in page_obj %}
+                    {% with asset_data=symbol_assets|get_item:symbol %}
                     <tr style="border-top: 2px solid #343a40;">
-                        <td colspan="4" class="coin-header">
-                            <a href="{% url 'coin_detail' symbol %}" class="text-decoration-none" style="color: #f0b90b;">
-                                <strong># {{ symbol }}</strong>
-                                <small class="text-muted ms-2" style="font-size: 0.7rem;">(История ↗)</small>
-                            </a>
+                        <td colspan="3" class="coin-header py-2">
+                            <div class="d-flex align-items-center">
+                                {% if asset_data.image %}
+                                    <img src="{{ asset_data.image }}" width="24" height="24" class="rounded-circle me-2" alt="">
+                                {% endif %}
+                                
+                                <a href="{% url 'coin_detail' symbol %}" class="text-decoration-none d-flex align-items-center" style="color: #f0b90b;">
+                                    <strong class="fs-5 me-2">{{ symbol }}</strong>
+                                    <i class="bi bi-graph-up-arrow text-muted" style="font-size: 0.8rem;"></i>
+                                </a>
+                            </div>
                         </td>
-                        <td colspan="4" class="text-end coin-header">
+                        
+                        <td class="text-end text-muted small align-middle">
+                            {% if asset_data.market_cap %}
+                                ${{ asset_data.market_cap|intword }}
+                            {% else %} - {% endif %}
+                        </td>
+                        <td class="text-end text-muted small align-middle">
+                            {% if asset_data.volume %}
+                                ${{ asset_data.volume|intword }}
+                            {% else %} - {% endif %}
+                        </td>
+
+                        <td colspan="2" class="text-end align-middle">
                             {% with spread=symbol_spreads|get_item:symbol %}
                                 {% if spread > 0 %}
-                                    <span class="badge bg-success" style="font-size: 0.8rem;">
-                                        Спред: {{ spread|floatformat:2 }}% APR
+                                    <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25">
+                                        Спред: {{ spread|floatformat:2 }}%
                                     </span>
                                 {% endif %}
                             {% endwith %}
                         </td>
                     </tr>
+                    {% endwith %}
 
                     {% for row in grouped_data|get_item:symbol %}
                     <tr class="data-row">
-                        <td><span class="fw-bold">{{ row.exchange }}</span></td>
-                        <td class="text-end {% if row.live_rate > 0 %}text-pos{% elif row.live_rate < 0 %}text-neg{% endif %}">
-                            {{ row.live_rate|floatformat:4 }}%
-                        </td>
-                        <td class="text-end text-white">${{ row.price|floatformat:2 }}</td>
-                        <td class="text-end fw-bold {% if row.live_apr > 0 %}text-pos{% elif row.live_apr < 0 %}text-neg{% endif %}">
-                            {{ row.live_apr|floatformat:2 }}%
-                        </td>
-                        <td class="text-end {% if row.hist_rate > 0 %}text-pos{% elif row.hist_rate < 0 %}text-neg{% endif %}" style="background-color: #2b313930;">
-                            {{ row.hist_rate|floatformat:4 }}%
-                        </td>
+                        <td class="ps-4"><span class="text-secondary">{{ row.exchange }}</span></td>
+                        <td></td> 
+                        <td></td>
+                        
+                        <td class="text-end text-white">${{ row.price|floatformat:4 }}</td>
+                        
                         <td class="text-end fw-bold {% if row.hist_apr > 0 %}text-pos{% elif row.hist_apr < 0 %}text-neg{% endif %}" style="background-color: #2b313930;">
                             {{ row.hist_apr|floatformat:2 }}%
                         </td>
+                        
                         <td class="text-center">
                             {% if row.side == "SHORT" %}
-                                <span class="badge bg-danger-subtle text-danger" style="font-size: 0.7rem;">SHORT (Получаешь)</span>
+                                <span class="badge bg-danger-subtle text-danger" style="font-size: 0.7rem; width: 60px;">SHORT</span>
                             {% else %}
-                                <span class="badge bg-success-subtle text-success" style="font-size: 0.7rem;">LONG (Получаешь)</span>
+                                <span class="badge bg-success-subtle text-success" style="font-size: 0.7rem; width: 60px;">LONG</span>
                             {% endif %}
                         </td>
-                        <td class="text-center text-white">{{ row.payouts }}</td>
+                        <td class="text-center text-secondary small">{{ row.payouts }}/день</td>
                     </tr>
                     {% endfor %}
                 {% empty %}
                     <tr>
-                        <td colspan="8" class="text-center py-5 text-muted">Монеты не найдены по выбранным фильтрам</td>
+                        <td colspan="7" class="text-center py-5 text-muted">Монеты не найдены</td>
                     </tr>
                 {% endfor %}
             </tbody>

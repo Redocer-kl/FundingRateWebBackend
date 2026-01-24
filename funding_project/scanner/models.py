@@ -1,7 +1,7 @@
 from django.db import models
+from django.conf import settings
 
 class Exchange(models.Model):
-    """Справочник бирж (Hyperliquid, Drift, Bitget...)"""
     name = models.CharField(max_length=50, unique=True)
     is_active = models.BooleanField(default=True)
     api_url = models.CharField(max_length=255, blank=True, null=True)
@@ -9,34 +9,52 @@ class Exchange(models.Model):
     def __str__(self):
         return self.name
 
+class Asset(models.Model):
+    symbol = models.CharField(max_length=20, unique=True, help_text="Универсальный символ (BTC, ETH)")
+    
+    market_cap = models.DecimalField(max_digits=25, decimal_places=2, null=True, blank=True)
+    volume_24h = models.DecimalField(max_digits=25, decimal_places=2, null=True, blank=True)
+    image_url = models.URLField(max_length=500, null=True, blank=True)
+    
+    coingecko_id = models.CharField(max_length=100, null=True, blank=True, unique=True)
+
+    def __str__(self):
+        return self.symbol
+
 class Ticker(models.Model):
-    """Торговые пары (BTC-USD, ETH-USDT...)"""
     exchange = models.ForeignKey(Exchange, on_delete=models.CASCADE, related_name='tickers')
-    symbol = models.CharField(max_length=50) 
+    
+    asset = models.ForeignKey(Asset, on_delete=models.SET_NULL, null=True, blank=True, related_name='tickers')
+    
+    symbol = models.CharField(max_length=50)     
     original_symbol = models.CharField(max_length=100) 
 
     last_price = models.DecimalField(max_digits=20, decimal_places=8, null=True, blank=True)
     
+
     class Meta:
         unique_together = ('exchange', 'symbol')
 
+    def save(self, *args, **kwargs):
+        if not self.asset_id:
+            clean_symbol = self.symbol.upper().replace('1000', '').replace('K', '').split('-')[0]
+            
+            asset_obj, _ = Asset.objects.get_or_create(symbol=clean_symbol)
+            self.asset = asset_obj
+            
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.symbol} ({self.exchange.name})"
+        return f"{self.symbol} @ {self.exchange.name}"
 
 class FundingRate(models.Model):
-    """
-    Исторические данные по фандингу.
-    Уникальность определяется биржей, тикером и временем.
-    """
     ticker = models.ForeignKey(Ticker, on_delete=models.CASCADE, related_name='funding_rates')
-    
     timestamp = models.DateTimeField(db_index=True)
-    
     rate = models.DecimalField(max_digits=20, decimal_places=10)
-    
     period_hours = models.IntegerField(default=1) 
-    
     apr = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
+
+   
 
     class Meta:
         ordering = ['-timestamp']
@@ -53,3 +71,18 @@ class FundingRate(models.Model):
 
     def __str__(self):
         return f"{self.ticker.symbol} @ {self.timestamp}: {self.apr}% APR"
+    
+
+class Favorite(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='favorites')
+    asset = models.ForeignKey(Asset, on_delete=models.CASCADE, null=True, blank=True)
+    exchange = models.ForeignKey(Exchange, on_delete=models.CASCADE, null=True, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'asset', 'exchange')
+
+    def __str__(self):
+        target = self.asset.symbol if self.asset else self.exchange.name
+        return f"{self.user.username} follows {target}"
