@@ -23,7 +23,7 @@ class FavoriteSerializer(serializers.ModelSerializer):
 class AssetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Asset
-        fields = ['symbol', 'name', 'image_url', 'market_cap', 'volume_24h']
+        fields = ['symbol', 'image_url', 'market_cap', 'volume_24h']
 
 class ExchangeSerializer(serializers.ModelSerializer):
     class Meta:

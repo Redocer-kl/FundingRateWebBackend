@@ -72,3 +72,33 @@ class BaseScanner(ABC):
         except Exception as e:
             logger.warning(f"{self.name} _get Exception for {url}: {e}")
             raise
+
+    @retry(stop=stop_after_attempt(3), wait=wait_fixed(2),
+           retry=retry_if_exception_type((requests.RequestException, Exception)), reraise=True)
+    def _post(self, url, data=None, json_data=None, params=None, headers=None):
+        try:
+            # cloudscraper.session.post принимает json=... и data=...
+            resp = self.session.post(url, params=params, data=data, json=json_data, headers=headers, timeout=15)
+
+            if resp.status_code == 429:
+                logger.warning(f"{self.name} 429 rate limit for {url}")
+
+            resp.raise_for_status()
+
+            try:
+                return resp.json()
+            except ValueError:
+                return resp.text
+        except requests.HTTPError as e:
+            resp = getattr(e, 'response', None)
+            status = resp.status_code if resp is not None else 'N/A'
+            text = ''
+            try:
+                text = (resp.text[:1000] if resp is not None and resp.text else str(e))
+            except Exception:
+                text = str(e)
+            logger.warning(f"{self.name} _post HTTPError {status} for {url}. Body: {text}")
+            raise
+        except Exception as e:
+            logger.warning(f"{self.name} _post Exception for {url}: {e}")
+            raise

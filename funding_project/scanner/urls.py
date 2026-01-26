@@ -3,6 +3,9 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from . import views, api_views
 
 api_urlpatterns = [
+    #Stats
+    path('stats/', api_views.ScannerStatsView.as_view(), name='api-stats'),
+
     # CoinData
     path('funding-table/', api_views.FundingTableAPIView.as_view(), name='api_funding_table'),
     path('coin-detail/<str:symbol>/', api_views.CoinDetailAPIView.as_view(), name='api_coin_detail'),
