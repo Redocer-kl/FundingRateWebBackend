@@ -266,3 +266,11 @@ body {
     color: #ffffff !important;
     font-weight: 500;
 }
+
+.font-mono {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+.bg-success, .bg-danger {
+    transition: width 0.1s ease-in-out;
+}

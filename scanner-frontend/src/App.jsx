@@ -3,6 +3,7 @@ import {AuthProvider} from './context/AuthContext'
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Logout from './components/Logout'; 
+import ArbitragePage from './pages/ArbitragePage';
 
 import FundingTablePage from './pages/FundingTablePage';
 import ProfilePage from './pages/ProfilePage';
@@ -25,6 +26,7 @@ function App() {
             <Route path="/coin/:symbol" element={<CoinDetailPage />} />         
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/orders" element={<ArbitragePage />} />
             
             <Route path="/logout" element={<Logout />} />
 
