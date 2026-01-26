@@ -86,7 +86,7 @@ const CoinDetailPage = () => {
                                 <h5 className="mb-0 fw-bold" style={{ color: EXCHANGE_COLORS[stat.exchange] || '#fff' }}>
                                     {stat.exchange}
                                 </h5>
-                                <span className="badge bg-dark border border-secondary text-muted">
+                                <span className="badge bg-dark border border-secondary text-light">
                                     {stat.price?.toFixed(4)} $
                                 </span>
                             </div>

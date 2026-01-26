@@ -9,6 +9,7 @@ api_urlpatterns = [
     # CoinData
     path('funding-table/', api_views.FundingTableAPIView.as_view(), name='api_funding_table'),
     path('coin-detail/<str:symbol>/', api_views.CoinDetailAPIView.as_view(), name='api_coin_detail'),
+    path('best-opportunities/', api_views.BestOpportunitiesAPIView.as_view(), name='api_best_opportunities/'),
 
     # Auth
     path('register/', api_views.RegisterView.as_view(), name='api_register'),

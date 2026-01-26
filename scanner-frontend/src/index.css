@@ -221,3 +221,48 @@ body {
 .card-text.text-muted {
     color: #b0b8c1 !important;
 }
+
+/* Улучшенная читаемость текста */
+.custom-muted {
+    color: #aeb9c3 !important; /* Светло-серый, хорошо виден на черном */
+}
+
+/* Аватар в профиле */
+.profile-avatar {
+    width: 80px;
+    height: 80px;
+    background-color: var(--accent-color);
+    color: #000;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    box-shadow: 0 0 20px rgba(252, 163, 17, 0.2);
+}
+
+.favorite-item {
+    background-color: rgba(255, 255, 255, 0.03);
+    transition: all 0.2s ease;
+}
+
+.favorite-item:hover {
+    background-color: rgba(255, 255, 255, 0.07);
+    border-color: var(--accent-color) !important;
+    transform: translateY(-2px);
+}
+
+.empty-state i {
+    font-size: 4rem;
+    color: var(--accent-color);
+}
+
+.scanner-card {
+    background-color: #1a1a1a !important;
+    border: 1px solid #333 !important;
+}
+
+.empty-state .text-light {
+    color: #ffffff !important;
+    font-weight: 500;
+}

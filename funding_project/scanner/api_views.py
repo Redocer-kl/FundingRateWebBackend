@@ -32,13 +32,17 @@ class ToggleFavoriteView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def post(self, request):
-        asset_id = request.data.get('asset_id')
-        exchange_id = request.data.get('exchange_id')
+        symbol = request.data.get('asset_symbol')
         
+        try:
+            asset_obj = Asset.objects.get(symbol=symbol)
+        except Asset.DoesNotExist:
+            return Response({"error": f"Asset {symbol} not found"}, status=404)
+
         fav, created = Favorite.objects.get_or_create(
             user=request.user,
-            asset_id=asset_id,
-            exchange_id=exchange_id
+            asset=asset_obj,
+            exchange=None 
         )
         
         if not created:
@@ -146,7 +150,6 @@ class CoinDetailAPIView(APIView):
     def get(self, request, symbol):
         time_threshold = timezone.now() - timedelta(days=30)
         
-        # Получаем тикеры. Важно: мы уже подгружаем 'exchange' и 'asset'
         tickers = Ticker.objects.filter(symbol=symbol).select_related('exchange', 'asset')
         
         if not tickers.exists():
@@ -160,24 +163,20 @@ class CoinDetailAPIView(APIView):
         for t in tickers:
             rates_qs = t.funding_rates.filter(timestamp__gte=time_threshold).order_by('timestamp')
             
-            # Данные для графика
             points = list(rates_qs.values('timestamp', 'apr'))
             history.append({
                 'exchange': t.exchange.name,
                 'points': [{'t': p['timestamp'], 'v': p['apr']} for p in points]
             })
 
-            # Считаем средний APR
             avg_apr = rates_qs.aggregate(Avg('apr'))['apr__avg'] or 0
             
-            # Получаем последнюю ставку
             latest_rate = rates_qs.last()
             
             summary_stats.append({
                 'exchange': t.exchange.name,
                 'current_apr': latest_rate.apr if latest_rate else 0,
                 'avg_apr': round(avg_apr, 2),
-                # ИСПРАВЛЕНИЕ ТУТ: берем last_price из модели Ticker (переменная t)
                 'price': float(t.last_price) if t.last_price else 0
             })
 
@@ -193,7 +192,66 @@ class ScannerStatsView(APIView):
         stats = {
             'total_coins': Ticker.objects.values('symbol').distinct().count(),
             'total_exchanges': Exchange.objects.count(),
-            # Отдаем только время в формате ISO для фронта
             'last_update': FundingRate.objects.order_by('-timestamp').first().timestamp if FundingRate.objects.exists() else None
         }
         return Response(stats)
+    
+
+
+class BestOpportunitiesAPIView(APIView):
+    def get(self, request):
+        period_param = request.query_params.get('period', '1d')
+        search_query = request.query_params.get('q', '').strip().upper()
+        side_filter = request.query_params.get('side', 'ALL')
+        
+        page_number = request.query_params.get('page', 1)
+        page_size = request.query_params.get('page_size', 30)
+
+        days_map = {'1d': 1, '3d': 3, '7d': 7, '14d': 14, '30d': 30}
+        time_threshold = timezone.now() - timedelta(days=days_map.get(period_param, 1))
+
+        tickers = Ticker.objects.select_related('exchange').prefetch_related(
+            Prefetch('funding_rates', 
+                     queryset=FundingRate.objects.filter(timestamp__gte=time_threshold),
+                     to_attr='filtered_rates')
+        )
+
+        if search_query:
+            tickers = tickers.filter(symbol__icontains=search_query)
+
+        opportunities = []
+        for t in tickers:
+            rates = t.filtered_rates 
+            if not rates: continue
+
+            avg_apr = sum(r.apr for r in rates) / len(rates)
+            if avg_apr == 0: continue
+
+            current_side = 'SHORT' if avg_apr > 0 else 'LONG'
+            yield_val = abs(float(avg_apr))
+
+            if side_filter != 'ALL' and side_filter != current_side:
+                continue
+
+            opportunities.append({
+                'symbol': t.symbol,
+                'exchange': t.exchange.name,
+                'apr': round(yield_val, 2),
+                'side': current_side,
+                'price': float(t.last_price) if t.last_price else 0,
+            })
+
+        opportunities.sort(key=lambda x: x['apr'], reverse=True)
+
+        paginator = Paginator(opportunities, page_size)
+        try:
+            page_obj = paginator.page(page_number)
+        except:
+            page_obj = paginator.page(1)
+
+        return Response({
+            'count': paginator.count,
+            'total_pages': paginator.num_pages,
+            'current_page': page_obj.number,
+            'results': list(page_obj)
+        })
