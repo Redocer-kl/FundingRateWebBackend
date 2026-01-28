@@ -4,9 +4,15 @@ import api from '../api';
 import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { TradeContext } from '../context/TradeContext'; 
+import { toast } from 'react-toastify'; 
 
 const FundingTablePage = () => {
     const { user } = useContext(AuthContext);
+    
+    // Достаем методы для установки позиций
+    const { setLongLeg, setShortLeg } = useContext(TradeContext);
+
     const navigate = useNavigate();
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -36,6 +42,22 @@ const FundingTablePage = () => {
         { label: 'Market Cap', value: 'market_cap' },
         { label: 'Объем', value: 'volume' }
     ];
+
+    const handleSelectPosition = (type, rawSymbol, exchange) => {
+        const symbol = rawSymbol.toUpperCase().endsWith('USDT') 
+            ? rawSymbol.toUpperCase() 
+            : `${rawSymbol.toUpperCase()}USDT`;
+
+        const positionData = { symbol, exchange };
+
+        if (type === 'LONG') {
+            setLongLeg(positionData);
+            toast.success(`LONG: ${symbol} (${exchange}) выбран!`, { theme: "dark" });
+        } else {
+            setShortLeg(positionData);
+            toast.error(`SHORT: ${symbol} (${exchange}) выбран!`, { theme: "dark" });
+        }
+    };
 
     const fetchFavorites = useCallback(async () => {
         const token = localStorage.getItem('access');
@@ -135,15 +157,17 @@ const FundingTablePage = () => {
                                 <th className="text-end">Цена</th>
                                 <th className="text-end">Avg APR</th>
                                 <th className="text-center">Выплат</th>
+                                {/* ДОБАВИЛ КОЛОНКУ TRADE */}
+                                <th className="text-end pe-4">Trade</th>
                             </tr>
                         </thead>
                         {loading ? (
-                            <tbody><tr><td colSpan="4" className="text-center py-5">Загрузка...</td></tr></tbody>
+                            <tbody><tr><td colSpan="5" className="text-center py-5">Загрузка...</td></tr></tbody>
                         ) : (
                             data.map((item) => (
                                 <tbody key={item.symbol} className="border-bottom border-secondary border-opacity-25">
                                     <tr style={{ backgroundColor: '#1a1a1a' }}>
-                                        <td colSpan="4" className="px-3 py-2">
+                                        <td colSpan="5" className="px-3 py-2">
                                             <div className="d-flex align-items-center">
                                                 <i className={`bi ${favorites.includes(item.symbol) ? 'bi-star-fill text-warning' : 'bi-star text-light'} cursor-pointer me-3 fs-5`} 
                                                    onClick={() => toggleFavorite(item.symbol)}></i>
@@ -178,6 +202,24 @@ const FundingTablePage = () => {
                                             <td className="text-center">
                                                 <span className="badge bg-dark border border-secondary text-light">{row.frequency}x</span>
                                             </td>
+                                            
+                                            {/* === КНОПКИ LONG / SHORT === */}
+                                            <td className="text-end pe-4">
+                                                <div className="btn-group btn-group-sm">
+                                                    <button 
+                                                        className="btn btn-outline-success py-0 px-2 font-mono fw-bold" 
+                                                        title="В Лонг"
+                                                        onClick={() => handleSelectPosition('LONG', item.symbol, row.exchange)}
+                                                    >L</button>
+                                                    <button 
+                                                        className="btn btn-outline-danger py-0 px-2 font-mono fw-bold" 
+                                                        title="В Шорт"
+                                                        onClick={() => handleSelectPosition('SHORT', item.symbol, row.exchange)}
+                                                    >S</button>
+                                                </div>
+                                            </td>
+                                            {/* =========================== */}
+
                                         </tr>
                                     ))}
                                 </tbody>
@@ -194,7 +236,6 @@ const FundingTablePage = () => {
                         
                         <nav>
                             <ul className="pagination pagination-sm mb-0 shadow-sm">
-                                {/* Кнопка Назад */}
                                 <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
                                     <button 
                                         className="page-link bg-dark border-secondary text-white px-3" 
@@ -204,7 +245,6 @@ const FundingTablePage = () => {
                                     </button>
                                 </li>
 
-                                {/* Логика номеров страниц */}
                                 {(() => {
                                     let pages = [];
                                     const start = Math.max(1, currentPage - 2);
@@ -225,7 +265,6 @@ const FundingTablePage = () => {
                                     return pages;
                                 })()}
 
-                                {/* Кнопка Вперед */}
                                 <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
                                     <button 
                                         className="page-link bg-dark border-secondary text-white px-3" 

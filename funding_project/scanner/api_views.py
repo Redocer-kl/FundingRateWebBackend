@@ -9,6 +9,8 @@ from django.utils import timezone
 from datetime import timedelta
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Prefetch
+import requests
+from rest_framework.permissions import AllowAny
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -255,3 +257,27 @@ class BestOpportunitiesAPIView(APIView):
             'current_page': page_obj.number,
             'results': list(page_obj)
         })
+    
+class ExchangeProxyView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        exchange = request.query_params.get('exchange', 'Binance').lower()
+        symbol = request.query_params.get('symbol', 'BTCUSDT')
+        interval = request.query_params.get('interval', '1min')
+        limit = request.query_params.get('limit', '150')
+
+        if exchange == 'coinex':
+            # Специфичный URL для CoinEx
+            url = f"https://api.coinex.com/perpetual/v1/market/kline?market={symbol}&type={interval}&limit={limit}"
+        elif exchange == 'binance':
+            url = f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol}&interval={interval}&limit={limit}"
+        else:
+            return Response({"error": "Unsupported exchange"}, status=400)
+
+        try:
+            # Делаем запрос от имени сервера
+            response = requests.get(url, timeout=10)
+            return Response(response.json())
+        except Exception as e:
+            return Response({"error": str(e)}, status=502)
