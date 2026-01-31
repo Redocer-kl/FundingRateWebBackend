@@ -11,8 +11,11 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Prefetch
 import requests
 from rest_framework.permissions import AllowAny
+import time
+from functools import lru_cache
 
 class RegisterView(generics.CreateAPIView):
+    permission_classes = [AllowAny]
     queryset = User.objects.all()
     permission_classes = (permissions.AllowAny,)
     serializer_class = UserSerializer
@@ -54,6 +57,7 @@ class ToggleFavoriteView(APIView):
         return Response({"status": "added"})
 
 class FundingTableAPIView(APIView):
+    permission_classes = [AllowAny]
     def get(self, request):
         period = request.query_params.get('period', '1d')
         search = request.query_params.get('q', '').upper()
@@ -149,6 +153,7 @@ class FundingTableAPIView(APIView):
         })
 
 class CoinDetailAPIView(APIView):
+    permission_classes = [AllowAny]
     def get(self, request, symbol):
         time_threshold = timezone.now() - timedelta(days=30)
         
@@ -190,6 +195,7 @@ class CoinDetailAPIView(APIView):
         })
     
 class ScannerStatsView(APIView):
+    permission_classes = [AllowAny]
     def get(self, request):
         stats = {
             'total_coins': Ticker.objects.values('symbol').distinct().count(),
@@ -201,6 +207,7 @@ class ScannerStatsView(APIView):
 
 
 class BestOpportunitiesAPIView(APIView):
+    permission_classes = [AllowAny]
     def get(self, request):
         period_param = request.query_params.get('period', '1d')
         search_query = request.query_params.get('q', '').strip().upper()
@@ -262,22 +269,112 @@ class ExchangeProxyView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        exchange = request.query_params.get('exchange', 'Binance').lower()
-        symbol = request.query_params.get('symbol', 'BTCUSDT')
-        interval = request.query_params.get('interval', '1min')
+        paradex_session = requests.Session()
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Content-Type": "application/json"
+        }
+        exchange = request.query_params.get('exchange', '').lower()
+        symbol = request.query_params.get('symbol', '').upper().strip().replace(" ", "")
+        interval = request.query_params.get('interval', '1m')
         limit = request.query_params.get('limit', '150')
 
-        if exchange == 'coinex':
-            # Специфичный URL для CoinEx
-            url = f"https://api.coinex.com/perpetual/v1/market/kline?market={symbol}&type={interval}&limit={limit}"
-        elif exchange == 'binance':
-            url = f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol}&interval={interval}&limit={limit}"
-        else:
-            return Response({"error": "Unsupported exchange"}, status=400)
+        if not exchange or not symbol:
+            return Response({"error": "Exchange and symbol required"}, status=400)
 
         try:
-            # Делаем запрос от имени сервера
-            response = requests.get(url, timeout=10)
-            return Response(response.json())
+            # --- BINANCE ---
+            if exchange == 'binance':
+                url = f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol}&interval={interval}&limit={limit}"
+                res = requests.get(url, timeout=10)
+
+            # --- COINEX ---
+            elif exchange == 'coinex':
+                coinex_interval = '1min' if interval == '1m' else interval
+                url = f"https://api.coinex.com/perpetual/v1/market/kline?market={symbol}&type={coinex_interval}&limit={limit}"
+                res = requests.get(url, timeout=10)
+
+            # --- KUCOIN ---
+            elif exchange == 'kucoin':
+                k_symbol = symbol if symbol.endswith('M') else f"{symbol}M"
+                granularity = 1 
+                url = f"https://api-futures.kucoin.com/api/v1/kline/query?symbol={k_symbol}&granularity={granularity}"
+                res = requests.get(url, headers=headers, timeout=10)
+
+            # --- BITGET ---
+            elif exchange == 'bitget':
+                url = f"https://api.bitget.com/api/v2/mix/market/candles?symbol={symbol}&granularity=1m&limit={limit}&productType=usdt-margined"
+                res = requests.get(url, timeout=10)
+
+            # --- PARADEX ---
+            elif exchange == 'paradex':
+
+                @lru_cache(maxsize=2000)
+                def get_pyth_feed_id(symbol_name):
+                    try:
+                        clean_symbol = symbol_name.replace('USDT', '').replace('USD', '')
+                        search_url = f"https://benchmarks.pyth.network/v1/price_feeds?query={clean_symbol}&asset_type=crypto"
+                        search_res = requests.get(search_url, timeout=5)
+                        if search_res.status_code == 200:
+                            feeds = search_res.json()
+                            for feed in feeds:
+                                if clean_symbol in feed['attributes']['symbol']:
+                                    return feed['id']
+                        return None
+                    except Exception as e:
+                        print(f"Pyth Search Error: {e}")
+                        return None
+
+                feed_id = get_pyth_feed_id(symbol)
+                
+                if not feed_id:
+                    feed_id = "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace"
+
+                end_time = int(time.time())
+                start_time = end_time - (int(limit) * 60)
+                
+                url = "https://benchmarks.pyth.network/v1/shims/tradingview/history"
+                
+                params = {
+                    "symbol": f"Crypto.{symbol.replace('USDT', '')}/USD",
+                    "resolution": "1",
+                    "from": start_time,
+                    "to": end_time
+                }
+                
+                res = requests.get(url, params=params, timeout=10)
+                
+                if res.status_code == 200:
+                    return Response(res.json())
+                else:
+                    return Response({"error": "Pyth history failed"}, status=502)
+
+            # --- HYPERLIQUID ---
+            elif exchange == 'hyperliquid':
+                url = "https://api.hyperliquid.xyz/info"
+                h_symbol = symbol.replace('USDT', '')
+                payload = {
+                    "type": "candleSnapshot",
+                    "req": {"coin": h_symbol, "interval": "1m", "startTime": 0}
+                }
+                res = requests.post(url, json=payload, headers=headers, timeout=10)
+            
+            else:
+                return Response({"error": "Not supported"}, status=400)
+
+            res.raise_for_status()
+            return Response(res.json(), status=res.status_code)
+
         except Exception as e:
+            print(f"Proxy Error [{exchange}]: {e}")
             return Response({"error": str(e)}, status=502)
+
+class KucoinTokenView(APIView):
+    permission_classes = [AllowAny]
+    def post(self, request):
+        try:
+            url = "https://api-futures.kucoin.com/api/v1/bullet-public"
+            res = requests.post(url, timeout=5)
+            return Response(res.json())
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)

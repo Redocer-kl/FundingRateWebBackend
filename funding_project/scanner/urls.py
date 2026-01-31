@@ -5,6 +5,7 @@ from . import views, api_views
 api_urlpatterns = [
     #Proxy
     path('proxy/kline/', api_views.ExchangeProxyView.as_view(), name='kline-proxy'),
+    path('proxy/kucoin-token/', api_views.KucoinTokenView.as_view(), name='kline-kucoin-token'),
 
     #Stats
     path('stats/', api_views.ScannerStatsView.as_view(), name='api-stats'),

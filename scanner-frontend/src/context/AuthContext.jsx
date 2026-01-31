@@ -13,7 +13,6 @@ export const AuthProvider = ({ children }) => {
         const res = await api.post('token/', { username, password });
         localStorage.setItem('access', res.data.access);
         localStorage.setItem('refresh', res.data.refresh);
-        // Сохраняем имя пользователя
         localStorage.setItem('username', username);
         setUser({ username });
         navigate('/profile');
@@ -32,7 +31,6 @@ export const AuthProvider = ({ children }) => {
         const storedUsername = localStorage.getItem('username');
         
         if (token && storedUsername) {
-            // Теперь user — это объект, а не просто true
             setUser({ username: storedUsername });
         }
         setLoading(false);

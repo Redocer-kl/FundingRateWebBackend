@@ -3,95 +3,124 @@
 @import 'bootstrap/dist/css/bootstrap.min.css';
 
 :root {
-  --bg-dark: #121212;
-  --bg-card: #1e1e1e;
-  --text-main: #e0e0e0;
-  --text-muted: #a0a0a0;
-  --accent-color: #fca311; /* Оранжевый как в примере */
-  --border-color: #333;
+    --bg-dark: #121212;
+    --bg-card: #1e1e1e;
+    --text-main: #e0e0e0;
+    --text-muted: #a0a0a0;
+    --accent-color: #fca311;
+    /* Оранжевый как в примере */
+    --border-color: #333;
 }
 
 body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: var(--bg-dark) !important;
-  color: var(--text-main) !important;
-  min-height: 100vh;
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+        sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: var(--bg-dark) !important;
+    color: var(--text-main) !important;
+    min-height: 100vh;
 }
 
 /* Карточки */
 .scanner-card {
-  background-color: var(--bg-card);
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-  margin-bottom: 20px;
+    background-color: var(--bg-card);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    margin-bottom: 20px;
 }
 
 /* Таблица */
 .table-custom {
-  width: 100%;
-  border-collapse: collapse;
+    width: 100%;
+    border-collapse: collapse;
 }
 
 .table-custom thead th {
-  color: var(--text-muted);
-  font-weight: 500;
-  font-size: 0.85rem;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-color);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+    color: var(--text-muted);
+    font-weight: 500;
+    font-size: 0.85rem;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 /* Фиксируем ширину колонок, чтобы заголовки не уезжали */
-.col-exchange { width: 20%; }
-.col-mcap { width: 20%; text-align: right; }
-.col-price { width: 20%; text-align: right; }
-.col-apr { width: 20%; text-align: right; }
-.col-payout { width: 20%; text-align: center; }
+.col-exchange {
+    width: 20%;
+}
+
+.col-mcap {
+    width: 20%;
+    text-align: right;
+}
+
+.col-price {
+    width: 20%;
+    text-align: right;
+}
+
+.col-apr {
+    width: 20%;
+    text-align: right;
+}
+
+.col-payout {
+    width: 20%;
+    text-align: center;
+}
 
 /* Строка с монетой */
 .coin-header {
-  background-color: #252525;
-  border-top: 1px solid var(--border-color);
+    background-color: #252525;
+    border-top: 1px solid var(--border-color);
 }
 
 /* Строки с биржами */
 .data-row td {
-  padding: 10px 0;
-  border-bottom: 1px solid #2a2a2a;
-  vertical-align: middle;
-  font-size: 0.95rem;
+    padding: 10px 0;
+    border-bottom: 1px solid #2a2a2a;
+    vertical-align: middle;
+    font-size: 0.95rem;
 }
 
 .data-row:last-child td {
-  border-bottom: none;
+    border-bottom: none;
 }
 
 /* Цвета для значений */
-.text-pos { color: #00e676; } /* Зеленый */
-.text-neg { color: #ff5252; } /* Красный */
+.text-pos {
+    color: #00e676;
+}
+
+/* Зеленый */
+.text-neg {
+    color: #ff5252;
+}
+
+/* Красный */
 
 /* Кнопки пагинации и фильтров */
 .btn-dark-custom {
-  background-color: #2d2d2d;
-  color: var(--text-main);
-  border: 1px solid var(--border-color);
+    background-color: #2d2d2d;
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
 }
-.btn-dark-custom:hover, .btn-dark-custom.active {
-  background-color: var(--accent-color);
-  color: #000;
-  border-color: var(--accent-color);
+
+.btn-dark-custom:hover,
+.btn-dark-custom.active {
+    background-color: var(--accent-color);
+    color: #000;
+    border-color: var(--accent-color);
 }
 
 .form-check-input:checked {
-  background-color: var(--accent-color);
-  border-color: var(--accent-color);
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
 }
 
 .filter-overlay {
@@ -115,8 +144,15 @@ body {
 }
 
 @keyframes slideIn {
-    from { transform: translateY(-20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 .coin-header-row {
@@ -124,17 +160,19 @@ body {
     border-left: 3px solid var(--accent-color);
 }
 
-.btn-check:checked + .btn-outline-warning {
+.btn-check:checked+.btn-outline-warning {
     background-color: var(--accent-color) !important;
     color: black !important;
 }
 
-.cursor-pointer { cursor: pointer; }
+.cursor-pointer {
+    cursor: pointer;
+}
 
 .input-group-text {
     background-color: #2d2d2d !important;
     border-color: #444 !important;
-    color: #ffc107 !important; 
+    color: #ffc107 !important;
 }
 
 .form-control {
@@ -146,15 +184,15 @@ body {
 }
 
 .text-light {
-    color: #f8f9fa !important; 
+    color: #f8f9fa !important;
 }
 
 .text-muted {
-    color: #aeb9c3 !important; 
+    color: #aeb9c3 !important;
 }
 
 .lead.text-muted {
-    color: #ced4da !important; 
+    color: #ced4da !important;
 }
 
 .btn-dark-custom {
@@ -180,17 +218,23 @@ body {
 }
 
 /* Цвет иконок принудительно */
-.bi-search, .bi-sliders, .bi-chevron-left, .bi-chevron-right {
-    color: #ffc107 !important; /* Желтый цвет для системных иконок */
+.bi-search,
+.bi-sliders,
+.bi-chevron-left,
+.bi-chevron-right {
+    color: #ffc107 !important;
+    /* Желтый цвет для системных иконок */
     display: inline-block;
 }
 
 .bi-star {
-    color: #666 !important; /* Серый для пустой звезды */
+    color: #666 !important;
+    /* Серый для пустой звезды */
 }
 
 .bi-star-fill {
-    color: #ffc107 !important; /* Желтый для избранного */
+    color: #ffc107 !important;
+    /* Желтый для избранного */
 }
 
 .btn-dark-custom i {
@@ -202,8 +246,13 @@ body {
     color: #f1f1f1 !important;
 }
 
-.text-pos { color: #00ff88 !important; }
-.text-neg { color: #ff4444 !important; }
+.text-pos {
+    color: #00ff88 !important;
+}
+
+.text-neg {
+    color: #ff4444 !important;
+}
 
 .btn-dark-custom:disabled i {
     color: #444 !important;
@@ -214,7 +263,7 @@ body {
 }
 
 .info-section {
-    background: #252a30 !important; 
+    background: #252a30 !important;
     border: 1px solid #343a40;
 }
 
@@ -224,7 +273,8 @@ body {
 
 /* Улучшенная читаемость текста */
 .custom-muted {
-    color: #aeb9c3 !important; /* Светло-серый, хорошо виден на черном */
+    color: #aeb9c3 !important;
+    /* Светло-серый, хорошо виден на черном */
 }
 
 /* Аватар в профиле */
@@ -271,6 +321,108 @@ body {
     font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
 }
 
-.bg-success, .bg-danger {
+.bg-success,
+.bg-danger {
     transition: width 0.1s ease-in-out;
+}
+
+/* контейнер - grid с 3 зонами (asks / mid / bids) */
+.orderbook-card .orderbook-grid {
+    display: grid;
+    gap: 4px;
+    height: calc(100% - 36px);
+    /* чуть корректируем под заголовок */
+    width: 100%;
+}
+
+/* секции asks/bids занимают свою часть и равномерно распределяют свои строки */
+.orderbook-card .asks,
+.orderbook-card .bids {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+    /* не даём внутреннему скроллу */
+    padding: 2px 0;
+}
+
+/* строка стакана: равномерно растягивается */
+.orderbook-card .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 6px;
+    box-sizing: border-box;
+    flex: 1 1 0;
+    /* равномерное распределение высоты внутри секции */
+    min-height: 18px;
+    /* минимальная высота строки */
+    max-height: 40px;
+    /* чтобы строка не была слишком большой */
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+    border-radius: 4px;
+}
+
+/* отдельно стили для asks / bids (цвета) */
+.orderbook-card .row-ask {
+    color: #ff6b6b;
+}
+
+.orderbook-card .row-bid {
+    color: #7efc6a;
+}
+
+/* колонки внутри строки - фиксированные ширины, чтобы при смене цифр макет не прыгал */
+.orderbook-card .row .col.price {
+    width: 65%;
+    text-align: left;
+    font-family: monospace;
+    font-size: 0.85rem;
+    overflow: hidden;
+}
+
+.orderbook-card .row .col.size {
+    width: 35%;
+    text-align: right;
+    font-family: monospace;
+    font-size: 0.85rem;
+    overflow: hidden;
+}
+
+/* центральная фиксированная полоса */
+.orderbook-card .mid-price {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
+    height: 100%;
+    box-sizing: border-box;
+    padding: 4px;
+}
+
+.orderbook-card .mid-inner {
+    text-align: center;
+}
+
+.orderbook-card .mid-inner .small {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.orderbook-card .mid-inner .big {
+    font-size: 16px;
+    font-weight: 700;
+    font-family: monospace;
+}
+
+.text-white-50 {
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+.font-mono {
+    font-family: 'Roboto Mono', monospace;
 }

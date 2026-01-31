@@ -1,152 +1,225 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { createChart, ColorType, CrosshairMode, CandlestickSeries } from 'lightweight-charts';
-// Импортируем твой настроенный инстанс
-import api from '../api'; 
+import React, { useEffect, useRef, useState } from 'react';
+import { createChart, ColorType, CandlestickSeries, LineStyle } from 'lightweight-charts';
+import api from '../api';
 
-const CandleChart = ({ symbol, exchange = 'Binance' }) => {
-    const chartContainerRef = useRef();
-    const chartRef = useRef(null);
-    const seriesRef = useRef(null);
-    const wsRef = useRef(null);
-    const [isLoading, setIsLoading] = useState(true);
+const normTime = (t) => {
+  const n = Number(t);
+  if (!isFinite(n) || n <= 0) return 0;
+  if (n > 1e11) return Math.floor(n / 1000);
+  if (n > 1e9) return Math.floor(n);
+  return Math.floor(n);
+};
 
-    // Конфигурации парсинга данных (оставляем, так как ответ от прокси будет сырым ответом биржи)
-    const CONFIG = useMemo(() => ({
-        'Binance': {
-            ws: (s) => `wss://fstream.binance.com/ws/${s.toLowerCase()}@kline_1m`,
-            parseHistory: (d) => d.map(k => ({ time: k[0] / 1000, open: parseFloat(k[1]), high: parseFloat(k[2]), low: parseFloat(k[3]), close: parseFloat(k[4]) })),
-            parseWS: (msg) => msg.k ? { time: msg.k.t / 1000, open: parseFloat(msg.k.o), high: parseFloat(msg.k.h), low: parseFloat(msg.k.l), close: parseFloat(msg.k.c) } : null
-        },
-        'Bitget': {
-            ws: () => `wss://ws.bitget.com/v2/ws/public`,
-            subscribe: (s) => ({ op: "subscribe", args: [{ instType: "mc", channel: "candle1m", instId: s.toUpperCase() }] }),
-            parseHistory: (d) => (d.data || []).map(k => ({ time: parseInt(k[0]) / 1000, open: parseFloat(k[1]), high: parseFloat(k[2]), low: parseFloat(k[3]), close: parseFloat(k[4]) })),
-            parseWS: (msg) => msg.data ? { time: parseInt(msg.data[0][0]) / 1000, open: parseFloat(msg.data[0][1]), high: parseFloat(msg.data[0][2]), low: parseFloat(msg.data[0][3]), close: parseFloat(msg.data[0][4]) } : null
-        },
-        'Kucoin': {
-            ws: () => `wss://api-futures.kucoin.com/api/v1/connection`, 
-            subscribe: (s) => ({ id: Date.now(), type: 'subscribe', topic: `/contractMarket/limitCandle:${s.toUpperCase()}_1min` }),
-            parseHistory: (d) => (d.data || []).map(k => ({ time: k[0] / 1000, open: parseFloat(k[1]), high: parseFloat(k[2]), low: parseFloat(k[3]), close: parseFloat(k[4]) })),
-            parseWS: (msg) => msg.data ? { time: msg.data.cycles[0] / 1000, open: parseFloat(msg.data.candles[0]), high: parseFloat(msg.data.candles[1]), low: parseFloat(msg.data.candles[2]), close: parseFloat(msg.data.candles[3]) } : null
-        },
-        'CoinEx': {
-            ws: () => `wss://socket.coinex.com/`,
-            subscribe: (s) => ({ method: "kline.subscribe", params: [s.toUpperCase(), 60], id: 1 }),
-            parseHistory: (d) => (d.data || []).map(k => ({ time: k[0], open: parseFloat(k[1]), high: parseFloat(k[3]), low: parseFloat(k[4]), close: parseFloat(k[2]) })),
-            parseWS: (msg) => (msg.method === "kline.update") ? { time: msg.params[0][0], open: parseFloat(msg.params[0][1]), high: parseFloat(msg.params[0][3]), low: parseFloat(msg.params[0][4]), close: parseFloat(msg.params[0][2]) } : null
-        },
-        'Paradex': {
-            ws: () => `wss://ws.api.paradex.trade/v1`,
-            subscribe: (s) => ({ method: "subscribe", params: { channel: `candles.1.${s.toUpperCase().replace('USDT', '-USD')}` } }),
-            parseHistory: (d) => (d.results || []).map(k => ({ time: k[0] / 1000, open: parseFloat(k[1]), high: parseFloat(k[2]), low: parseFloat(k[3]), close: parseFloat(k[4]) })),
-            parseWS: (msg) => (msg.channel?.startsWith('candles')) ? { time: msg.data.t / 1000, open: parseFloat(msg.data.o), high: parseFloat(msg.data.h), low: parseFloat(msg.data.l), close: parseFloat(msg.data.c) } : null
-        },
-        'Hyperliquid': {
-            ws: () => `wss://api.hyperliquid.xyz/ws`,
-            subscribe: (s) => ({ method: "subscribe", subscription: { type: "candle", coin: s.toUpperCase().replace('USDT', ''), interval: "1m" } }),
-            parseHistory: (d) => (d || []).map(k => ({ time: k.t / 1000, open: parseFloat(k.o), high: parseFloat(k.h), low: parseFloat(k.l), close: parseFloat(k.c) })),
-            parseWS: (msg) => (msg.channel === "candle" && msg.data) ? { time: msg.data.t / 1000, open: parseFloat(msg.data.o), high: parseFloat(msg.data.h), low: parseFloat(msg.data.l), close: parseFloat(msg.data.c) } : null
-        }
-    }), []);
+// ... твой CONFIG ... (оставляем без изменений, он у тебя рабочий)
+const CONFIG = {
+  Binance: {
+    getWsUrl: async (s) => `wss://stream.binance.com:9443/ws/${s.toLowerCase()}@kline_1m`,
+    parseHistory: (d) => (d || []).map(k => ({ time: normTime(k[0]), open: parseFloat(k[1]), high: parseFloat(k[2]), low: parseFloat(k[3]), close: parseFloat(k[4]) })),
+    parseWS: (msg) => (msg?.k ? ({ time: normTime(msg.k.t), open: parseFloat(msg.k.o), high: parseFloat(msg.k.h), low: parseFloat(msg.k.l), close: parseFloat(msg.k.c) }) : null)
+  },
+  // ... остальные конфиги (Paradex, Kucoin и т.д.) оставляем как были
+  Paradex: {
+    getWsUrl: async () => `wss://ws.api.prod.paradex.trade/v1`,
+    subscribe: (s) => ({ jsonrpc: "2.0", method: "subscribe", params: { channel: "candles", market: s.replace('USDT', '-USD-PERP'), resolution: "1" }, id: Date.now() }),
+    parseHistory: (d) => {
+      if (d && d.t) return d.t.map((time, i) => ({ time: normTime(time), open: parseFloat(d.o[i]), high: parseFloat(d.h[i]), low: parseFloat(d.l[i]), close: parseFloat(d.c[i]) }));
+      return [];
+    },
+    parseWS: (msg) => {
+      if (msg.params?.data && msg.params.channel === 'candles') {
+        const dd = msg.params.data;
+        return { time: normTime(dd.t), open: parseFloat(dd.o), high: parseFloat(dd.h), low: parseFloat(dd.l), close: parseFloat(dd.c) };
+      }
+      return null;
+    }
+  },
+  Kucoin: {
+    getWsUrl: async (s, tokenFunc) => await tokenFunc(),
+    subscribe: (s) => ({ type: 'subscribe', topic: `/contractMarket/limitCandle:${s.toUpperCase()}M_1min`, id: Date.now() }),
+    parseHistory: (d) => (d.data || []).map(k => ({ time: normTime(k[0]), open: parseFloat(k[1]), high: parseFloat(k[2]), low: parseFloat(k[3]), close: parseFloat(k[4]) })).sort((a,b)=>a.time-b.time),
+    parseWS: (msg) => {
+      if (msg.type === 'message' && msg.data && msg.data.candles) {
+        const c = msg.data.candles;
+        return { time: normTime(c[0]), open: parseFloat(c[1]), high: parseFloat(c[2]), low: parseFloat(c[3]), close: parseFloat(c[4]) };
+      }
+      return null;
+    }
+  },
+  Bitget: {
+    getWsUrl: async () => `wss://ws.bitget.com/v2/ws/public`,
+    subscribe: (s) => ({ op: "subscribe", args: [{ instType: "mc", channel: "candle1m", instId: s.toUpperCase() }] }),
+    parseHistory: (d) => (d.data || []).map(k => ({ time: normTime(k[0]), open: parseFloat(k[1]), high: parseFloat(k[2]), low: parseFloat(k[3]), close: parseFloat(k[4]) })),
+    parseWS: (msg) => (msg.data && Array.isArray(msg.data[0])) ? ({ time: normTime(parseInt(msg.data[0][0])), open: parseFloat(msg.data[0][1]), high: parseFloat(msg.data[0][2]), low: parseFloat(msg.data[0][3]), close: parseFloat(msg.data[0][4]) }) : null
+  },
+  Hyperliquid: {
+    getWsUrl: async () => `wss://api.hyperliquid.xyz/ws`,
+    subscribe: (s) => ({ method: "subscribe", subscription: { type: "candle", coin: s.toUpperCase().replace('USDT',''), interval: "1m" } }),
+    parseHistory: (d) => (d || []).map(k => ({ time: normTime(k.t), open: parseFloat(k.o), high: parseFloat(k.h), low: parseFloat(k.l), close: parseFloat(k.c) })).sort((a,b)=>a.time-b.time),
+    parseWS: (msg) => (msg.channel === "candle" && msg.data) ? ({ time: normTime(msg.data.t), open: parseFloat(msg.data.o), high: parseFloat(msg.data.h), low: parseFloat(msg.data.l), close: parseFloat(msg.data.c) }) : null
+  },
+  CoinEx: {
+    getWsUrl: async () => `wss://socket.coinex.com/`,
+    subscribe: (s) => ({ method: "kline.subscribe", params: [s.toUpperCase(), 60], id: 1 }),
+    parseHistory: (d) => (d.data || []).map(k => ({ time: normTime(k[0]), open: parseFloat(k[1]), high: parseFloat(k[3]), low: parseFloat(k[4]), close: parseFloat(k[2]) })),
+    parseWS: (msg) => (msg.method === "kline.update" && msg.params?.[0]) ? ({ time: normTime(msg.params[0][0]), open: parseFloat(msg.params[0][1]), high: parseFloat(msg.params[0][3]), low: parseFloat(msg.params[0][4]), close: parseFloat(msg.params[0][2]) }) : null
+  }
+};
 
-    useEffect(() => {
-        if (!chartContainerRef.current) return;
+/**
+ * levels prop format: [{ price: number, color: string, title: string }]
+ */
+const CandleChart = ({ symbol, exchange = 'Binance', levels = [] }) => {
+  const chartContainerRef = useRef();
+  const seriesRef = useRef(null);
+  const wsRef = useRef(null);
+  const chartRef = useRef(null);
+  const lastTimeRef = useRef(0);
+  const reconnectCountRef = useRef(0);
+  
+  // Ref для хранения созданных линий, чтобы мы могли их удалять при обновлении
+  const priceLinesRef = useRef([]); 
+  const [isLoading, setIsLoading] = useState(true);
 
-        const chart = createChart(chartContainerRef.current, {
-            layout: { background: { type: ColorType.Solid, color: '#000000' }, textColor: '#d1d4dc' },
-            grid: { vertLines: { color: '#1f1f1f' }, horzLines: { color: '#1f1f1f' } },
-            crosshair: { mode: CrosshairMode.Normal },
-            timeScale: { borderColor: '#333', timeVisible: true },
-            height: 300,
+  const getKucoinToken = async () => {
+    try {
+      const { data } = await api.post('proxy/kucoin-token/');
+      return data.code === "200000" && data.data?.instanceServers?.[0]?.endpoint ? `${data.data.instanceServers[0].endpoint}?token=${data.data.token}` : null;
+    } catch (e) { console.error('kucoin token error', e); return null; }
+  };
+
+  // Эффект отрисовки линий (срабатывает, когда меняются levels или создается серия)
+  useEffect(() => {
+    if (!seriesRef.current) return;
+
+    // 1. Удаляем старые линии
+    priceLinesRef.current.forEach(line => {
+      seriesRef.current.removePriceLine(line);
+    });
+    priceLinesRef.current = [];
+
+    // 2. Рисуем новые линии, если цена валидна (> 0)
+    levels.forEach(lvl => {
+      if (lvl.price && !isNaN(lvl.price) && parseFloat(lvl.price) > 0) {
+        const line = seriesRef.current.createPriceLine({
+          price: parseFloat(lvl.price),
+          color: lvl.color || '#FFFFFF',
+          lineWidth: 2,
+          lineStyle: LineStyle.Dotted,
+          axisLabelVisible: true,
+          title: lvl.title || '',
         });
+        priceLinesRef.current.push(line);
+      }
+    });
+  }, [levels]); // Зависимость от levels
 
-        const candlestickSeries = chart.addSeries(CandlestickSeries, {
-            upColor: '#26a69a', downColor: '#ef5350', borderVisible: false,
-            wickUpColor: '#26a69a', wickDownColor: '#ef5350',
-        });
+  // Основной эффект графика и WS
+  useEffect(() => {
+    if (!chartContainerRef.current) return;
 
-        chartRef.current = chart;
-        seriesRef.current = candlestickSeries;
+    const chart = createChart(chartContainerRef.current, {
+      layout: { background: { type: ColorType.Solid, color: '#000000' }, textColor: '#d1d4dc' },
+      grid: { vertLines: { color: '#1f1f1f' }, horzLines: { color: '#1f1f1f' } },
+      timeScale: { borderColor: '#333', timeVisible: true },
+      height: 300,
+    });
+    chartRef.current = chart;
 
-        const loadData = async () => {
-            setIsLoading(true);
-            const pair = symbol.toUpperCase();
-            const exCfg = CONFIG[exchange] || CONFIG['Binance'];
+    const candlestickSeries = chart.addSeries(CandlestickSeries, { 
+      upColor: '#26a69a', downColor: '#ef5350', wickUpColor: '#26a69a', wickDownColor: '#ef5350' 
+    });
+    seriesRef.current = candlestickSeries;
 
-            try {
-                // Используем твой api.js для проксирования
-                // Путь 'proxy/kline/' должен соответствовать твоему urls.py в Django
-                const res = await api.get('proxy/kline/', {
-                    params: {
-                        exchange: exchange,
-                        symbol: pair,
-                        interval: exchange === 'CoinEx' ? '1min' : '1m', // Небольшой фикс для нейминга интервалов
-                        limit: 150
-                    }
-                });
+    let mounted = true;
 
-                const formatted = exCfg.parseHistory(res.data);
-                
-                if (formatted && formatted.length > 0) {
-                    candlestickSeries.setData(formatted);
-                    chart.timeScale().fitContent();
-                }
+    const connect = async () => {
+      setIsLoading(true);
+      reconnectCountRef.current = 0;
+      const exCfg = CONFIG[exchange] || CONFIG.Binance;
 
-                // WebSocket (прямое соединение)
-                if (wsRef.current) wsRef.current.close();
-                const wsUrl = exCfg.ws(pair);
-                
-                if (wsUrl) {
-                    wsRef.current = new WebSocket(wsUrl);
-                    wsRef.current.onopen = () => {
-                        if (wsRef.current?.readyState === WebSocket.OPEN && exCfg.subscribe) {
-                            wsRef.current.send(JSON.stringify(exCfg.subscribe(pair)));
-                        }
-                    };
-                    wsRef.current.onmessage = (event) => {
-                        try {
-                            const msg = JSON.parse(event.data);
-                            const updated = exCfg.parseWS(msg);
-                            if (updated) candlestickSeries.update(updated);
-                        } catch (e) {}
-                    };
-                }
+      const doConnect = async () => {
+        try {
+          const res = await api.get('proxy/kline/', { params: { exchange, symbol, interval: '1m', limit: 150 } });
+          let formatted = exCfg.parseHistory(res.data || []);
+          formatted = (formatted || []).map(f => ({ ...f, time: normTime(f.time) })).sort((a,b)=>a.time-b.time);
+          
+          if (mounted && formatted.length) {
+            seriesRef.current.setData(formatted);
+            lastTimeRef.current = formatted[formatted.length - 1].time;
+            // Устанавливаем линии сразу после загрузки данных
+            // (хотя useEffect на [levels] сработает отдельно, это безопасно)
+          }
 
-            } catch (err) {
-                console.error(`[${exchange}] Chart Error:`, err);
-            } finally {
-                setIsLoading(false);
+          if (wsRef.current) {
+            try { wsRef.current.close(); } catch (e) {}
+            wsRef.current = null;
+          }
+
+          const wsUrl = await exCfg.getWsUrl(symbol, getKucoinToken);
+          if (!wsUrl) { if(mounted) setIsLoading(false); return; }
+
+          const ws = new WebSocket(wsUrl);
+          wsRef.current = ws;
+
+          ws.onopen = () => {
+            if (exCfg.subscribe && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify(exCfg.subscribe(symbol)));
             }
-        };
+          };
 
-        loadData();
+          ws.onmessage = (event) => {
+            let parsed;
+            try { parsed = JSON.parse(event.data); } catch (e) { return; }
+            const cand = exCfg.parseWS(parsed);
+            if (cand) {
+                cand.time = normTime(cand.time);
+                if (cand.time >= lastTimeRef.current) {
+                    seriesRef.current.update(cand);
+                    lastTimeRef.current = cand.time;
+                }
+            }
+          };
 
-        const handleResize = () => chart.applyOptions({ width: chartContainerRef.current.clientWidth });
-        window.addEventListener('resize', handleResize);
+          ws.onclose = () => {
+            if (reconnectCountRef.current < 3 && mounted) {
+              reconnectCountRef.current += 1;
+              setTimeout(() => { if (mounted) doConnect(); }, 1000 * reconnectCountRef.current);
+            }
+          };
+        } catch (err) {
+            console.error(err);
+        } finally {
+          if (mounted) setIsLoading(false);
+        }
+      }; 
+      await doConnect();
+    };
 
-        return () => {
-            window.removeEventListener('resize', handleResize);
-            if (wsRef.current) wsRef.current.close();
-            chart.remove();
-        };
-    }, [symbol, exchange, CONFIG]);
+    connect();
 
-    return (
-        <div className="position-relative bg-black border border-secondary mb-3 rounded shadow-sm">
-            <div className="p-2 border-bottom border-secondary d-flex justify-content-between align-items-center bg-dark bg-opacity-50">
-                <span className="fw-bold text-white small">
-                    {symbol} <span className="text-primary opacity-75">{exchange}</span>
-                </span>
-                <span className="badge bg-secondary opacity-50" style={{fontSize: '10px'}}>1m</span>
-            </div>
-            <div ref={chartContainerRef} style={{ width: '100%', height: '300px' }} />
-            {isLoading && (
-                <div className="position-absolute top-50 start-50 translate-middle">
-                    <div className="spinner-border spinner-border-sm text-primary" role="status"></div>
-                </div>
-            )}
-        </div>
-    );
+    // Resize handler
+    const handleResize = () => {
+        if(chartContainerRef.current) {
+            chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+        }
+    }
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      mounted = false;
+      window.removeEventListener('resize', handleResize);
+      if (wsRef.current) wsRef.current.close();
+      chart.remove();
+      priceLinesRef.current = [];
+    };
+  }, [symbol, exchange]); // Levels исключен, для него отдельный useEffect
+
+  return (
+    <div className="bg-black rounded border border-secondary border-opacity-25" style={{ width: '100%', height: '300px', position: 'relative' }}>
+      <div ref={chartContainerRef} style={{ width: '100%', height: '100%' }} />
+      {isLoading && <div className="position-absolute top-0 start-0 p-2 text-secondary small">Loading...</div>}
+    </div>
+  );
 };
 
 export default CandleChart;

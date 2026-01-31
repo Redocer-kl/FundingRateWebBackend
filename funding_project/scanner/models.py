@@ -86,3 +86,6 @@ class Favorite(models.Model):
     def __str__(self):
         target = self.asset.symbol if self.asset else self.exchange.name
         return f"{self.user.username} follows {target}"
+    
+
+    
