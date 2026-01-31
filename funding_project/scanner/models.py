@@ -1,5 +1,9 @@
 from django.db import models
 from django.conf import settings
+from django.contrib.auth import get_user_model
+
+
+User = get_user_model()
 
 class Exchange(models.Model):
     name = models.CharField(max_length=50, unique=True)
@@ -88,4 +92,36 @@ class Favorite(models.Model):
         return f"{self.user.username} follows {target}"
     
 
+class ArbitragePosition(models.Model):
+    STATUS_CHOICES = (
+        ('PENDING', 'Pending Entry'), # Ждем цены входа
+        ('ACTIVE', 'Active'),         # В позиции
+        ('CLOSING', 'Closing'),       # В процессе выхода
+        ('CLOSED', 'Closed'),         # Завершена
+        ('FAILED', 'Failed'),         # Ошибка
+    )
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='positions')
+    
+    long_ticker = models.ForeignKey(Ticker, on_delete=models.PROTECT, related_name='long_positions')
+    short_ticker = models.ForeignKey(Ticker, on_delete=models.PROTECT, related_name='short_positions')
+    
+    amount = models.DecimalField(max_digits=20, decimal_places=2, null=True, default=0, help_text="Общая сумма позиции в USDT")
+    
+    long_entry_target = models.DecimalField(max_digits=20, decimal_places=8, null=True, blank=True, help_text="Цена входа (если пусто - по рынку)")
+    long_exit_target = models.DecimalField(max_digits=20, decimal_places=8, null=True, blank=True, help_text="Тейк профит для лонга")
+    
+    short_entry_target = models.DecimalField(max_digits=20, decimal_places=8, null=True, blank=True)
+    short_exit_target = models.DecimalField(max_digits=20, decimal_places=8, null=True, blank=True)
+
+    realized_entry_long = models.DecimalField(max_digits=20, decimal_places=8, null=True, blank=True)
+    realized_entry_short = models.DecimalField(max_digits=20, decimal_places=8, null=True, blank=True)
+    
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Arb {self.id}: {self.long_ticker.symbol} vs {self.short_ticker.symbol} ({self.status})"
     

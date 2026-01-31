@@ -1,46 +1,68 @@
 import React, { useContext, useState } from 'react';
-import { TradeContext } from '../context/TradeContext';
-import OrderBook from '../components/OrderBook';
+import { TradeContext } from '../context/TradeContext'; 
+import OrderBook from '../components/OrderBook';     
 import CandleChart from '../components/CandleChart';
+import api from '../api'; 
 
 const DashboardPage = () => {
     const { longLeg, shortLeg } = useContext(TradeContext);
     
     const [amount, setAmount] = useState(100);
-    
     const [longEntry, setLongEntry] = useState('');
     const [longExit, setLongExit] = useState('');
     const [shortEntry, setShortEntry] = useState('');
     const [shortExit, setShortExit] = useState('');
 
-    const handleExecute = () => {
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleExecute = async () => {
         if (!longLeg || !shortLeg) return;
         
+        setIsSubmitting(true);
+
         const payload = {
-            long: { ...longLeg, entry: longEntry, exit: longExit },
-            short: { ...shortLeg, entry: shortEntry, exit: shortExit },
-            amount: amount
+            amount_usdt: parseFloat(amount),
+            
+            long_exchange: longLeg.exchange,
+            long_symbol: longLeg.symbol,
+            long_entry_target: longEntry ? parseFloat(longEntry) : null,
+            long_exit_target: longExit ? parseFloat(longExit) : null,
+
+            short_exchange: shortLeg.exchange,
+            short_symbol: shortLeg.symbol,
+            short_entry_target: shortEntry ? parseFloat(shortEntry) : null,
+            short_exit_target: shortExit ? parseFloat(shortExit) : null
         };
 
-        console.log("Executing Strategy:", payload);
-        alert(`Стратегия запущена!\nСумма: $${amount}\nLong: ${longLeg.symbol} (In: ${longEntry || 'Market'}, Out: ${longExit})\nShort: ${shortLeg.symbol} (In: ${shortEntry || 'Market'}, Out: ${shortExit})`);
+        console.log("Sending Strategy:", payload);
+
+        try {
+            const response = await api.post('/positions/', payload);
+            
+            alert(`✅ Стратегия запущена!\nID: ${response.data.id}\nСтатус: ${response.data.status}`);
+        } catch (error) {
+            console.error("Execution error:", error);
+            const errorMsg = error.response?.data 
+                ? JSON.stringify(error.response.data, null, 2) 
+                : "Ошибка соединения с сервером";
+            alert(`❌ Ошибка создания позиции:\n${errorMsg}`);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const getLevels = (entry, exit, isLong) => {
         const levels = [];
-        
         if (entry) levels.push({ 
-            price: entry, 
+            price: parseFloat(entry), 
             color: isLong ? '#00ff00' : '#ff0000', 
             title: 'ENTRY' 
         });
-        
         if (exit) levels.push({ 
-            price: exit, 
+            price: parseFloat(exit), 
             color: isLong ? '#ff0000' : '#00ff00', 
-            title: 'EXIT (TP/SL)' 
+            title: 'EXIT (TP)' 
         });
-
         return levels;
     };
 
@@ -68,7 +90,7 @@ const DashboardPage = () => {
                         <div className="d-flex justify-content-between mb-2 px-1 align-items-center">
                             <div>
                                 <span className="badge bg-success me-2">LONG</span>
-                                <span className="text-white font-mono">{longLeg ? `${longLeg.symbol}` : '--'}</span>
+                                <span className="text-white font-mono fw-bold">{longLeg ? `${longLeg.symbol}` : '--'}</span>
                                 <span className="text-secondary small ms-2">{longLeg?.exchange}</span>
                             </div>
                         </div>
@@ -78,12 +100,12 @@ const DashboardPage = () => {
                                 {/* Контролы цены для Long */}
                                 <div className="d-flex gap-2">
                                     <div className="input-group input-group-sm">
-                                        <span className="input-group-text bg-dark border-secondary text-success">In</span>
+                                        <span className="input-group-text bg-dark border-secondary text-success fw-bold">In</span>
                                         <input type="number" placeholder="Market" className="form-control bg-black text-white border-secondary" 
                                             value={longEntry} onChange={e => setLongEntry(e.target.value)} />
                                     </div>
                                     <div className="input-group input-group-sm">
-                                        <span className="input-group-text bg-dark border-secondary text-danger">Out</span>
+                                        <span className="input-group-text bg-dark border-secondary text-danger fw-bold">Out</span>
                                         <input type="number" placeholder="Target" className="form-control bg-black text-white border-secondary" 
                                             value={longExit} onChange={e => setLongExit(e.target.value)} />
                                     </div>
@@ -104,7 +126,7 @@ const DashboardPage = () => {
                     </div>
                 </div>
 
-                {/* === ЦЕНТРАЛЬНЫЙ БЛОК === */}
+                {/* === ЦЕНТРАЛЬНЫЙ БЛОК (EXECUTION) === */}
                 <div className="col-lg-2 d-flex flex-column gap-2">
                     {/* Статус / Инфо */}
                     <div className="p-3 border border-secondary border-opacity-25 rounded bg-dark bg-opacity-10 text-center">
@@ -127,11 +149,20 @@ const DashboardPage = () => {
 
                         <button 
                             className="btn btn-warning w-100 py-3 fw-bold shadow-warning"
-                            disabled={!longLeg || !shortLeg}
+                            disabled={!longLeg || !shortLeg || isSubmitting}
                             onClick={handleExecute}
                         >
-                            <i className="bi bi-lightning-fill me-1"></i> 
-                            EXECUTE
+                            {isSubmitting ? (
+                                <>
+                                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                    Sending...
+                                </>
+                            ) : (
+                                <>
+                                    <i className="bi bi-lightning-fill me-1"></i> 
+                                    EXECUTE
+                                </>
+                            )}
                         </button>
                     </div>
                 </div>
@@ -142,7 +173,7 @@ const DashboardPage = () => {
                         <div className="d-flex justify-content-between mb-2 px-1 align-items-center">
                             <div>
                                 <span className="badge bg-danger me-2">SHORT</span>
-                                <span className="text-white font-mono">{shortLeg ? `${shortLeg.symbol}` : '--'}</span>
+                                <span className="text-white font-mono fw-bold">{shortLeg ? `${shortLeg.symbol}` : '--'}</span>
                                 <span className="text-secondary small ms-2">{shortLeg?.exchange}</span>
                             </div>
                         </div>
@@ -152,12 +183,12 @@ const DashboardPage = () => {
                                 {/* Контролы цены для Short */}
                                 <div className="d-flex gap-2">
                                     <div className="input-group input-group-sm">
-                                        <span className="input-group-text bg-dark border-secondary text-danger">In</span>
+                                        <span className="input-group-text bg-dark border-secondary text-danger fw-bold">In</span>
                                         <input type="number" placeholder="Market" className="form-control bg-black text-white border-secondary" 
                                             value={shortEntry} onChange={e => setShortEntry(e.target.value)} />
                                     </div>
                                     <div className="input-group input-group-sm">
-                                        <span className="input-group-text bg-dark border-secondary text-success">Out</span>
+                                        <span className="input-group-text bg-dark border-secondary text-success fw-bold">Out</span>
                                         <input type="number" placeholder="Target" className="form-control bg-black text-white border-secondary" 
                                             value={shortExit} onChange={e => setShortExit(e.target.value)} />
                                     </div>

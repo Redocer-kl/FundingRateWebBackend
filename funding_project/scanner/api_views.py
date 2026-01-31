@@ -2,13 +2,12 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth.models import User
-from .models import Favorite, Asset, Ticker, Asset, Exchange, FundingRate
-from .serializers import UserSerializer, FavoriteSerializer, AssetSerializer, ExchangeSerializer
-from django.db.models import Avg
+from .models import Favorite, Asset, Ticker, Asset, Exchange, FundingRate, ArbitragePosition
+from .serializers import UserSerializer, FavoriteSerializer, AssetSerializer, ExchangeSerializer, ArbitragePositionSerializer
+from django.db.models import Avg, Prefetch
 from django.utils import timezone
 from datetime import timedelta
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.db.models import Prefetch
 import requests
 from rest_framework.permissions import AllowAny
 import time
@@ -25,14 +24,35 @@ class ProfileView(APIView):
 
     def get(self, request):
         user = request.user
+        
         favorites = Favorite.objects.filter(user=user)
-        serializer = FavoriteSerializer(favorites, many=True)
+        fav_serializer = FavoriteSerializer(favorites, many=True)
+        
+
+        positions = ArbitragePosition.objects.filter(user=user)
+        pos_serializer = ArbitragePositionSerializer(positions, many=True)
+        
         return Response({
             "username": user.username,
             "email": user.email,
-            "favorites": serializer.data
+            "favorites": fav_serializer.data,
+            "positions": pos_serializer.data  
         })
+    
+class ClosePositionView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
 
+    def post(self, request, pk):
+        try:
+            position = ArbitragePosition.objects.get(pk=pk, user=request.user)
+            
+            position.status = 'CLOSED'
+            position.save()
+            
+            return Response({"message": "Позиция закрыта успешно"}, status=200)
+        except ArbitragePosition.DoesNotExist:
+            return Response({"error": "Позиция не найдена"}, status=404)
+        
 class ToggleFavoriteView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
@@ -378,3 +398,21 @@ class KucoinTokenView(APIView):
             return Response(res.json())
         except Exception as e:
             return Response({"error": str(e)}, status=500)
+        
+
+
+class ArbitragePositionView(APIView):
+    permission_classes = [permissions.IsAuthenticated] 
+
+    def get(self, request):
+        positions = ArbitragePosition.objects.filter(user=request.user).order_by('-created_at')
+        serializer = ArbitragePositionSerializer(positions, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        """Создать новую арбитражную позицию"""
+        serializer = ArbitragePositionSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

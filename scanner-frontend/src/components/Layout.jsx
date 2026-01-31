@@ -52,6 +52,11 @@ const Layout = ({ children }) => {
                                             <i className="bi bi-person-vcard me-2"></i>Личный кабинет
                                         </Link>
                                     </li>
+                                    <li>
+                                        <Link className="dropdown-item py-2" to="/dashboard">
+                                            <i className="bi bi-person-vcard me-2"></i>Дешборд
+                                        </Link>
+                                    </li>
                                     <li><hr className="dropdown-divider border-secondary" /></li>
                                     <li>
                                         <button className="dropdown-item py-2 text-danger" onClick={logout}>

@@ -14,6 +14,7 @@ if [ "$DB_ENGINE" = "django.db.backends.postgresql" ]; then
 fi
 
 if [ "$RUN_MIGRATIONS" = "1" ]; then
+  python manage.py makemigrations  --noinput
   echo "Running migrations..."
   python manage.py migrate --noinput
   echo "Collectstatic..."
