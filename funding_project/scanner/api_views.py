@@ -399,8 +399,6 @@ class KucoinTokenView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=500)
         
-
-
 class ArbitragePositionView(APIView):
     permission_classes = [permissions.IsAuthenticated] 
 

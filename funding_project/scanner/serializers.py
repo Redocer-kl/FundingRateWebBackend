@@ -39,10 +39,11 @@ class FundingRateSerializer(serializers.ModelSerializer):
 class TickerDetailSerializer(serializers.ModelSerializer):
     exchange = serializers.ReadOnlyField(source='exchange.name')
     latest_funding = serializers.SerializerMethodField()
+    symbol = serializers.CharField()
 
     class Meta:
         model = Ticker
-        fields = ['exchange', 'last_price', 'latest_funding']
+        fields = ['exchange', 'symbol', 'last_price', 'latest_funding']
 
     def get_latest_funding(self, obj):
         rate = obj.funding_rates.order_by('-timestamp').first()

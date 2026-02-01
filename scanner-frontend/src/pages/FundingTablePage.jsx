@@ -10,7 +10,6 @@ import { toast } from 'react-toastify';
 const FundingTablePage = () => {
     const { user } = useContext(AuthContext);
     
-    // Достаем методы для установки позиций
     const { setLongLeg, setShortLeg } = useContext(TradeContext);
 
     const navigate = useNavigate();
@@ -31,7 +30,7 @@ const FundingTablePage = () => {
     const [tempFilters, setTempFilters] = useState({
         period: localStorage.getItem('f_period') || '30d',
         sort: localStorage.getItem('f_sort') || 'spread',
-        exchanges: JSON.parse(localStorage.getItem('f_exchanges')) || ['Binance', 'Bybit', 'OKX', 'Kucoin', 'Bitget']
+        exchanges: JSON.parse(localStorage.getItem('f_exchanges')) || ['Binance', 'Kucoin', 'Bitget', 'CoinEx', 'Paradex', 'Hyperliquid']
     });
 
     const [appliedFilters, setAppliedFilters] = useState({...tempFilters});

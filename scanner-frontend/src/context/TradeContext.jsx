@@ -21,13 +21,43 @@ export const TradeProvider = ({ children }) => {
         if (shortLeg) localStorage.setItem('shortLeg', JSON.stringify(shortLeg));
     }, [shortLeg]);
 
+    const setTradeParams = (params) => {
+        const rawSymbol = params.symbol || '';
 
-    useEffect(() => {
-        console.log("Current Trade State:", { longLeg, shortLeg });
-    }, [longLeg, shortLeg]);
+        const formattedSymbol = rawSymbol.toUpperCase().endsWith('USDT')
+            ? rawSymbol.toUpperCase()
+            : `${rawSymbol.toUpperCase()}USDT`;
+
+        const newLong = {
+            exchange: params.longExchange,
+            symbol: formattedSymbol,
+            amount: parseFloat(params.amount || 0),
+            entryTarget: parseFloat(params.longEntry || 0),
+            exitTarget: parseFloat(params.longExit || 0), 
+            isExternalUpdate: true
+        };
+
+        const newShort = {
+            exchange: params.shortExchange,
+            symbol: formattedSymbol,
+            amount: parseFloat(params.amount || 0),
+            entryTarget: parseFloat(params.shortEntry || 0),
+            exitTarget: parseFloat(params.shortExit || 0), 
+            isExternalUpdate: true
+        };
+
+        setLongLeg(newLong);
+        setShortLeg(newShort);
+
+        console.log("TradeContext: Full state updated", { newLong, newShort });
+    };
 
     return (
-        <TradeContext.Provider value={{ longLeg, setLongLeg, shortLeg, setShortLeg }}>
+        <TradeContext.Provider value={{
+            longLeg, setLongLeg,
+            shortLeg, setShortLeg,
+            setTradeParams
+        }}>
             {children}
         </TradeContext.Provider>
     );

@@ -20,26 +20,27 @@ const ProfilePage = () => {
         fetchProfile();
     }, []);
 
-    // Помощник для отрисовки статуса
     const renderStatusBadge = (status) => {
         const styles = {
             'OPEN': 'bg-success text-white',
             'PENDING': 'bg-warning text-dark',
             'CLOSED': 'bg-secondary text-light'
         };
-        return <span className={`badge ${styles[status] || 'bg-dark'} extra-small-badge`}>{status}</span>;
+        return <span className={`badge ${styles[status] || 'bg-dark'} extra-small-badge`} style={{fontSize: '10px'}}>{status}</span>;
     };
 
     const handleOpenInDashboard = (pos) => {
         setTradeParams({
             longExchange: pos.long_ticker.exchange,
             shortExchange: pos.short_ticker.exchange,
-            symbol: pos.long_ticker.symbol || profile.favorites[0]?.asset_symbol, // Берем из тикера или избранного
+            symbol: pos.long_ticker.symbol,
             amount: pos.amount,
             longEntry: pos.long_entry_target,
-            shortEntry: pos.short_entry_target
+            shortEntry: pos.short_entry_target,
+            longExit: pos.long_exit_target,
+            shortExit: pos.short_exit_target
         });
-        navigate('/'); 
+        navigate('/dashboard'); 
     };
 
     const handleClosePosition = async (id) => {
@@ -65,7 +66,7 @@ const ProfilePage = () => {
         <div className="container py-5">
             <div className="row g-4">
                 {/* Левая колонка */}
-                <div className="col-lg-4">
+                <div className="col-lg-3">
                     <div className="scanner-card p-4 border border-secondary shadow-lg mb-4">
                         <div className="text-center mb-4">
                             <div className="profile-avatar mx-auto mb-3">
@@ -80,10 +81,10 @@ const ProfilePage = () => {
                     </div>
 
                     <div className="scanner-card p-4 border border-secondary shadow-lg">
-                        <h6 className="text-white mb-3 fw-bold">ИЗБРАННОЕ</h6>
+                        <h6 className="text-white mb-3 fw-bold small">ИЗБРАННОЕ</h6>
                         {profile.favorites?.map(fav => (
-                            <div key={fav.id} className="d-flex justify-content-between align-items-center mb-2 p-2 border border-secondary rounded bg-dark-hover">
-                                <span className="text-warning fw-bold">{fav.asset_symbol}</span>
+                            <div key={fav.id} className="d-flex justify-content-between align-items-center mb-2 p-2 border border-secondary rounded favorite-item">
+                                <span className="text-warning fw-bold small">{fav.asset_symbol}</span>
                                 <Link to={`/coin/${fav.asset_symbol}`} className="btn btn-sm btn-link text-warning p-0">
                                     <i className="bi bi-arrow-right-circle-fill"></i>
                                 </Link>
@@ -93,22 +94,23 @@ const ProfilePage = () => {
                 </div>
 
                 {/* Правая колонка: Все позиции */}
-                <div className="col-lg-8">
+                <div className="col-lg-9">
                     <div className="scanner-card p-4 border border-secondary shadow-lg">
                         <h5 className="text-white mb-4 d-flex align-items-center fw-bold">
                             <i className="bi bi-activity text-warning me-2"></i> 
-                            ИСТОРИЯ ПОЗИЦИЙ
+                            ЖУРНАЛ ТОРГОВЛИ
                         </h5>
                         
                         <div className="table-responsive">
                             <table className="table table-dark table-hover align-middle border-secondary">
-                                <thead className="text-muted small uppercase">
-                                    <tr>
-                                        <th>Инструмент</th>
-                                        <th>Статус</th>
-                                        <th>Объем</th>
-                                        <th>Цели</th>
-                                        <th className="text-end">Действие</th>
+                                <thead className="text-muted small">
+                                    <tr style={{fontSize: '11px'}}>
+                                        <th>ID / ТИКЕР</th>
+                                        <th>БИРЖИ (L/S)</th>
+                                        <th>СТАТУС</th>
+                                        <th>ОБЪЕМ</th>
+                                        <th>ЦЕЛИ (IN / OUT)</th>
+                                        <th className="text-end">ДЕЙСТВИЕ</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -117,27 +119,43 @@ const ProfilePage = () => {
                                             <tr key={pos.id} className={pos.status === 'CLOSED' ? 'opacity-50' : ''}>
                                                 <td>
                                                     <div className="d-flex flex-column">
-                                                        <span className="fw-bold text-white">АРБИТРАЖ #{pos.id}</span>
-                                                        <span className="extra-small text-white-50">
-                                                            {pos.long_ticker.exchange} / {pos.short_ticker.exchange}
+                                                        <span className="fw-bold text-white small">#{pos.id}</span>
+                                                        <span className="text-warning font-mono" style={{fontSize: '12px'}}>
+                                                            {pos.long_ticker.symbol}
                                                         </span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div className="d-flex flex-column small">
+                                                        <span className="text-pos">{pos.long_ticker.exchange}</span>
+                                                        <span className="text-neg">{pos.short_ticker.exchange}</span>
                                                     </div>
                                                 </td>
                                                 <td>{renderStatusBadge(pos.status)}</td>
                                                 <td>
-                                                    <span className="text-info font-monospace">{pos.amount}</span>
+                                                    <span className="text-info font-mono small">{pos.amount}</span>
                                                 </td>
                                                 <td>
-                                                    <div className="extra-small text-white-50 ">
-                                                        L: {parseFloat(pos.long_entry_target).toFixed(4)} <br/>
-                                                        S: {parseFloat(pos.short_entry_target).toFixed(4)}
+                                                    <div className="font-mono" style={{fontSize: '11px', lineHeight: '1.2'}}>
+                                                        <div className="mb-1">
+                                                            <span className="text-pos me-1">L:</span>
+                                                            <span className="text-white-50">{parseFloat(pos.long_entry_target).toFixed(4)}</span>
+                                                            <i className="bi bi-arrow-right mx-1 text-muted"></i>
+                                                            <span className="text-white-50">{parseFloat(pos.long_exit_target).toFixed(4)}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-neg me-1">S:</span>
+                                                            <span className="text-white-50">{parseFloat(pos.short_entry_target).toFixed(4)}</span>
+                                                            <i className="bi bi-arrow-right mx-1 text-muted"></i>
+                                                            <span className="text-white-50">{parseFloat(pos.short_exit_target).toFixed(4)}</span>
+                                                        </div>
                                                     </div>
                                                 </td>
                                                 <td className="text-end">
                                                     <div className="btn-group">
                                                         <button 
                                                             onClick={() => handleOpenInDashboard(pos)}
-                                                            className="btn btn-sm btn-outline-warning"
+                                                            className="btn btn-sm btn-dark-custom"
                                                             title="Загрузить в терминал"
                                                         >
                                                             <i className="bi bi-box-arrow-in-up-right"></i>
@@ -147,7 +165,7 @@ const ProfilePage = () => {
                                                             <button 
                                                                 onClick={() => handleClosePosition(pos.id)}
                                                                 className="btn btn-sm btn-outline-danger"
-                                                                title="Закрыть"
+                                                                title="Закрыть позицию"
                                                             >
                                                                 <i className="bi bi-x-lg"></i>
                                                             </button>
@@ -158,7 +176,7 @@ const ProfilePage = () => {
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan="5" className="text-center py-5 text-muted small">
+                                            <td colSpan="6" className="text-center py-5 text-muted small">
                                                 Активности не обнаружено
                                             </td>
                                         </tr>
