@@ -202,3 +202,5 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+ENCRYPTION_KEY = os.getenv('EXCHANGE_ENCRYPTION_KEY')

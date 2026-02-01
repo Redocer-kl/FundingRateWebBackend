@@ -98,9 +98,6 @@ body {
     color: #ff5252;
 }
 
-/* Красный */
-
-/* Кнопки пагинации и фильтров */
 .btn-dark-custom {
     background-color: #2d2d2d;
     color: var(--text-main);
@@ -267,13 +264,11 @@ body {
     color: #b0b8c1 !important;
 }
 
-/* Улучшенная читаемость текста */
 .custom-muted {
     color: #aeb9c3 !important;
-    /* Светло-серый, хорошо виден на черном */
 }
 
-/* Аватар в профиле */
+
 .profile-avatar {
     width: 80px;
     height: 80px;
@@ -322,27 +317,25 @@ body {
     transition: width 0.1s ease-in-out;
 }
 
-/* контейнер - grid с 3 зонами (asks / mid / bids) */
+
 .orderbook-card .orderbook-grid {
     display: grid;
     gap: 4px;
     height: calc(100% - 36px);
-    /* чуть корректируем под заголовок */
     width: 100%;
 }
 
-/* секции asks/bids занимают свою часть и равномерно распределяют свои строки */
+
 .orderbook-card .asks,
 .orderbook-card .bids {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    overflow: hidden;
-    /* не даём внутреннему скроллу */
+    overflow: hidden;  
     padding: 2px 0;
 }
 
-/* строка стакана: равномерно растягивается */
+
 .orderbook-card .row {
     display: flex;
     justify-content: space-between;
@@ -350,11 +343,8 @@ body {
     padding: 0 6px;
     box-sizing: border-box;
     flex: 1 1 0;
-    /* равномерное распределение высоты внутри секции */
     min-height: 18px;
-    /* минимальная высота строки */
     max-height: 40px;
-    /* чтобы строка не была слишком большой */
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -362,7 +352,6 @@ body {
     border-radius: 4px;
 }
 
-/* отдельно стили для asks / bids (цвета) */
 .orderbook-card .row-ask {
     color: #ff6b6b;
 }
@@ -371,7 +360,6 @@ body {
     color: #7efc6a;
 }
 
-/* колонки внутри строки - фиксированные ширины, чтобы при смене цифр макет не прыгал */
 .orderbook-card .row .col.price {
     width: 65%;
     text-align: left;

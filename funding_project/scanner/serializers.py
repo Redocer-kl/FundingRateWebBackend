@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.db.models import Q
-from .models import Favorite, Asset, Exchange, FundingRate, Ticker, ArbitragePosition
+from .models import Favorite, Asset, Exchange, FundingRate, Ticker, ArbitragePosition, UserExchangeCredential, ParadexAgent
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -103,3 +103,47 @@ class ArbitragePositionSerializer(serializers.ModelSerializer):
             **validated_data
         )
         return position
+    
+
+class UserExchangeCredentialSerializer(serializers.ModelSerializer):
+    api_key = serializers.CharField(write_only=True)
+    api_secret = serializers.CharField(write_only=True)
+    passphrase = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    private_key = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    
+    exchange_name = serializers.SlugRelatedField(
+        slug_field='name', 
+        queryset=Exchange.objects.all(), 
+        source='exchange', 
+        write_only=True
+    )
+    display_name = serializers.CharField(source='exchange.name', read_only=True)
+
+    masked_key = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserExchangeCredential
+        fields = [
+            'exchange_name',
+            'display_name',  
+            'api_key', 'api_secret', 'passphrase', 'private_key',
+            'masked_key', 'is_valid', 'created_at', 'error_message'
+        ]
+        read_only_fields = ['id', 'created_at', 'is_valid', 'error_message']
+
+    def get_masked_key(self, obj):
+        try:
+            keys = obj.get_keys()
+            real_key = keys.get('apiKey')
+            if real_key and len(real_key) > 4:
+                return f"****{real_key[-4:]}"
+            return "****"
+        except:
+            return "Error decrypting"
+        
+
+class ParadexAgentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ParadexAgent
+        fields = ['stark_public_key', 'is_approved', 'created_at']
+        read_only_fields = ['stark_public_key', 'is_approved', 'created_at']

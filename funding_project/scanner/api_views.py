@@ -2,8 +2,9 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth.models import User
-from .models import Favorite, Asset, Ticker, Asset, Exchange, FundingRate, ArbitragePosition
-from .serializers import UserSerializer, FavoriteSerializer, AssetSerializer, ExchangeSerializer, ArbitragePositionSerializer
+from .models import Favorite, Asset, Ticker, Asset, Exchange, FundingRate, ArbitragePosition, HyperliquidAgent, UserExchangeCredential, ParadexAgent
+from starknet_py.net.signer.stark_curve_signer import KeyPair
+from .serializers import UserSerializer, FavoriteSerializer, AssetSerializer, ExchangeSerializer, ArbitragePositionSerializer, UserExchangeCredentialSerializer, ParadexAgentSerializer
 from django.db.models import Avg, Prefetch
 from django.utils import timezone
 from datetime import timedelta
@@ -12,6 +13,11 @@ import requests
 from rest_framework.permissions import AllowAny
 import time
 from functools import lru_cache
+from eth_account import Account
+from .utils.encryption import EncryptionUtil
+from hyperliquid.exchange import Exchange as ExchangeHL
+from hyperliquid.utils import constants
+from eth_account import Account as EthAccount
 
 class RegisterView(generics.CreateAPIView):
     permission_classes = [AllowAny]
@@ -414,3 +420,172 @@ class ArbitragePositionView(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+class GenerateAgentView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        """Возвращает текущего агента пользователя, если он есть"""
+        agent = HyperliquidAgent.objects.filter(user=request.user).last()
+        if not agent:
+            return Response({"agent": None})
+        
+        return Response({
+            "agent_address": agent.agent_address,
+            "is_approved": agent.is_approved,
+            "created_at": agent.created_at
+        })
+
+    def post(self, request):
+        """Генерирует нового агента"""
+        account = Account.create()
+        agent_address = account.address
+        private_key = account.key.hex()
+
+        HyperliquidAgent.objects.filter(user=request.user).delete()
+        
+        agent = HyperliquidAgent.objects.create(
+            user=request.user,
+            agent_address=agent_address
+        )
+        agent.set_private_key(private_key)
+        agent.save()
+
+        return Response({
+            "agent_address": agent_address,
+            "is_approved": False,
+            "message": "Agent generated. Please approve on frontend."
+        })
+    
+class ApproveAgentView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        agent = HyperliquidAgent.objects.filter(user=request.user).last()
+        if not agent:
+            return Response({"error": "No agent found"}, status=404)
+
+        signature = request.data.get('signature')
+        payload = request.data.get('payload')
+
+        if not signature or not payload:
+            return Response({"error": "Signature and payload required"}, status=400)
+
+        try:
+            agent_account = EthAccount.from_key(agent.get_private_key())  
+            agent.is_approved = True
+            agent.save()
+            
+            return Response({"status": "success", "message": "Agent activated on backend"})
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+    
+class UserExchangeCredentialView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        """Список всех подключенных бирж пользователя"""
+        credentials = UserExchangeCredential.objects.filter(user=request.user)
+        serializer = UserExchangeCredentialSerializer(credentials, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        """Добавление или обновление ключей"""
+        serializer = UserExchangeCredentialSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            exchange_obj = serializer.validated_data['exchange'] 
+            api_key = serializer.validated_data['api_key']
+            api_secret = serializer.validated_data['api_secret']
+            passphrase = serializer.validated_data.get('passphrase')
+            private_key = serializer.validated_data.get('private_key')
+
+            credential, created = UserExchangeCredential.objects.get_or_create(
+                user=request.user,
+                exchange=exchange_obj
+            )
+
+            credential.set_keys(
+                api_key=api_key,
+                api_secret=api_secret,
+                passphrase=passphrase,
+                private_key=private_key
+            )
+            
+            credential.is_valid = True
+            credential.error_message = None
+            credential.save()
+
+            status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
+            return Response(
+                UserExchangeCredentialSerializer(credential).data, 
+                status=status_code
+            )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request):
+        """Удаление ключей по ID"""
+        cred_id = request.data.get('id') or request.query_params.get('id')
+        
+        if not cred_id:
+            return Response({"error": "ID required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            credential = UserExchangeCredential.objects.get(id=cred_id, user=request.user)
+            credential.delete()
+            return Response({"message": "Credential deleted"}, status=status.HTTP_200_OK)
+        except UserExchangeCredential.DoesNotExist:
+            return Response({"error": "Credential not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+class ParadexAgentGenerateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        """Получить текущего агента Paradex"""
+        agent = ParadexAgent.objects.filter(user=request.user).last()
+        if not agent:
+            return Response({"agent": None})
+        serializer = ParadexAgentSerializer(agent)
+        return Response(serializer.data)
+
+    def post(self, request):
+        """Генерация нового Starknet-агента"""
+        key_pair = KeyPair.generate()
+        private_key_hex = hex(key_pair.private_key)
+        public_key_hex = hex(key_pair.public_key)
+
+        ParadexAgent.objects.filter(user=request.user).delete()
+        
+        agent = ParadexAgent.objects.create(
+            user=request.user,
+            stark_public_key=public_key_hex
+        )
+        agent.set_private_key(private_key_hex)
+        agent.save()
+
+        return Response({
+            "stark_public_key": public_key_hex,
+            "is_approved": False,
+            "message": "Paradex agent generated. Please sign message in MetaMask."
+        }, status=status.HTTP_201_CREATED)
+
+class ParadexAgentApproveView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        """Принимает подпись от фронтенда и активирует агента"""
+        signature = request.data.get('signature')
+        
+        agent = ParadexAgent.objects.filter(user=request.user).last()
+        if not agent:
+            return Response({"error": "No agent found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if not signature:
+            return Response({"error": "Signature required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        agent.is_approved = True
+        agent.save()
+
+        return Response({"status": "success", "message": "Paradex agent approved"})

@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from .utils.encryption import EncryptionUtil
 
 
 User = get_user_model()
@@ -125,3 +126,80 @@ class ArbitragePosition(models.Model):
     def __str__(self):
         return f"Arb {self.id}: {self.long_ticker.symbol} vs {self.short_ticker.symbol} ({self.status})"
     
+
+class UserExchangeCredential(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='credentials')
+    exchange = models.ForeignKey(Exchange, on_delete=models.CASCADE)
+    
+    encrypted_api_key = models.TextField()
+    encrypted_api_secret = models.TextField()
+    encrypted_passphrase = models.TextField(null=True, blank=True) 
+    
+    encrypted_wallet_private_key = models.TextField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_valid = models.BooleanField(default=True) 
+    error_message = models.TextField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ('user', 'exchange')
+
+    def set_keys(self, api_key, api_secret, passphrase=None, private_key=None):
+        crypt = EncryptionUtil()
+        self.encrypted_api_key = crypt.encrypt(api_key)
+        self.encrypted_api_secret = crypt.encrypt(api_secret)
+        if passphrase:
+            self.encrypted_passphrase = crypt.encrypt(passphrase)
+        if private_key:
+            self.encrypted_wallet_private_key = crypt.encrypt(private_key)
+
+    def get_keys(self):
+        crypt = EncryptionUtil()
+        return {
+            'apiKey': crypt.decrypt(self.encrypted_api_key),
+            'secret': crypt.decrypt(self.encrypted_api_secret),
+            'password': crypt.decrypt(self.encrypted_passphrase) if self.encrypted_passphrase else None,
+            'privateKey': crypt.decrypt(self.encrypted_wallet_private_key) if self.encrypted_wallet_private_key else None
+        }
+
+    def __str__(self):
+        return f"Keys for {self.user.username} on {self.exchange.name}"
+    
+class HyperliquidAgent(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='hl_agents')
+    
+    agent_address = models.CharField(max_length=42)
+    
+    encrypted_private_key = models.TextField()
+    
+    is_approved = models.BooleanField(default=False) 
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def set_private_key(self, private_key):
+        crypt = EncryptionUtil()
+        self.encrypted_private_key = crypt.encrypt(private_key)
+
+    def get_private_key(self):
+        crypt = EncryptionUtil()
+        return crypt.decrypt(self.encrypted_private_key)
+    
+class ParadexAgent(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='paradex_agents')
+    
+    stark_public_key = models.CharField(max_length=128)
+    
+    encrypted_private_key = models.TextField()
+    
+    is_approved = models.BooleanField(default=False) 
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def set_private_key(self, private_key):
+        crypt = EncryptionUtil()
+        self.encrypted_private_key = crypt.encrypt(private_key)
+
+    def get_private_key(self):
+        crypt = EncryptionUtil()
+        return crypt.decrypt(self.encrypted_private_key)
+
+    def __str__(self):
+        return f"Paradex Agent for {self.user.username}"
