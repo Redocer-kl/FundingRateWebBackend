@@ -10,14 +10,12 @@ const normTime = (t) => {
   return Math.floor(n);
 };
 
-// ... твой CONFIG ... (оставляем без изменений, он у тебя рабочий)
 const CONFIG = {
   Binance: {
     getWsUrl: async (s) => `wss://stream.binance.com:9443/ws/${s.toLowerCase()}@kline_1m`,
     parseHistory: (d) => (d || []).map(k => ({ time: normTime(k[0]), open: parseFloat(k[1]), high: parseFloat(k[2]), low: parseFloat(k[3]), close: parseFloat(k[4]) })),
     parseWS: (msg) => (msg?.k ? ({ time: normTime(msg.k.t), open: parseFloat(msg.k.o), high: parseFloat(msg.k.h), low: parseFloat(msg.k.l), close: parseFloat(msg.k.c) }) : null)
   },
-  // ... остальные конфиги (Paradex, Kucoin и т.д.) оставляем как были
   Paradex: {
     getWsUrl: async () => `wss://ws.api.prod.paradex.trade/v1`,
     subscribe: (s) => ({ jsonrpc: "2.0", method: "subscribe", params: { channel: "candles", market: s.replace('USDT', '-USD-PERP'), resolution: "1" }, id: Date.now() }),
@@ -65,9 +63,7 @@ const CONFIG = {
   }
 };
 
-/**
- * levels prop format: [{ price: number, color: string, title: string }]
- */
+
 const CandleChart = ({ symbol, exchange = 'Binance', levels = [] }) => {
   const chartContainerRef = useRef();
   const seriesRef = useRef(null);
@@ -76,28 +72,25 @@ const CandleChart = ({ symbol, exchange = 'Binance', levels = [] }) => {
   const lastTimeRef = useRef(0);
   const reconnectCountRef = useRef(0);
   
-  // Ref для хранения созданных линий, чтобы мы могли их удалять при обновлении
+
   const priceLinesRef = useRef([]); 
   const [isLoading, setIsLoading] = useState(true);
 
   const getKucoinToken = async () => {
     try {
-      const { data } = await api.post('proxy/kucoin-token/');
+      const { data } = await api.post('api/proxy/kucoin-token/');
       return data.code === "200000" && data.data?.instanceServers?.[0]?.endpoint ? `${data.data.instanceServers[0].endpoint}?token=${data.data.token}` : null;
     } catch (e) { console.error('kucoin token error', e); return null; }
   };
 
-  // Эффект отрисовки линий (срабатывает, когда меняются levels или создается серия)
   useEffect(() => {
     if (!seriesRef.current) return;
 
-    // 1. Удаляем старые линии
     priceLinesRef.current.forEach(line => {
       seriesRef.current.removePriceLine(line);
     });
     priceLinesRef.current = [];
 
-    // 2. Рисуем новые линии, если цена валидна (> 0)
     levels.forEach(lvl => {
       if (lvl.price && !isNaN(lvl.price) && parseFloat(lvl.price) > 0) {
         const line = seriesRef.current.createPriceLine({
@@ -111,9 +104,8 @@ const CandleChart = ({ symbol, exchange = 'Binance', levels = [] }) => {
         priceLinesRef.current.push(line);
       }
     });
-  }, [levels]); // Зависимость от levels
+  }, [levels]); 
 
-  // Основной эффект графика и WS
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
@@ -139,15 +131,13 @@ const CandleChart = ({ symbol, exchange = 'Binance', levels = [] }) => {
 
       const doConnect = async () => {
         try {
-          const res = await api.get('proxy/kline/', { params: { exchange, symbol, interval: '1m', limit: 150 } });
+          const res = await api.get('api/proxy/kline/', { params: { exchange, symbol, interval: '1m', limit: 150 } });
           let formatted = exCfg.parseHistory(res.data || []);
           formatted = (formatted || []).map(f => ({ ...f, time: normTime(f.time) })).sort((a,b)=>a.time-b.time);
           
           if (mounted && formatted.length) {
             seriesRef.current.setData(formatted);
             lastTimeRef.current = formatted[formatted.length - 1].time;
-            // Устанавливаем линии сразу после загрузки данных
-            // (хотя useEffect на [levels] сработает отдельно, это безопасно)
           }
 
           if (wsRef.current) {
@@ -197,7 +187,6 @@ const CandleChart = ({ symbol, exchange = 'Binance', levels = [] }) => {
 
     connect();
 
-    // Resize handler
     const handleResize = () => {
         if(chartContainerRef.current) {
             chart.applyOptions({ width: chartContainerRef.current.clientWidth });
@@ -212,7 +201,7 @@ const CandleChart = ({ symbol, exchange = 'Binance', levels = [] }) => {
       chart.remove();
       priceLinesRef.current = [];
     };
-  }, [symbol, exchange]); // Levels исключен, для него отдельный useEffect
+  }, [symbol, exchange]); 
 
   return (
     <div className="bg-black rounded border border-secondary border-opacity-25" style={{ width: '100%', height: '300px', position: 'relative' }}>

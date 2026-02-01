@@ -189,7 +189,7 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
-STATIC_URL = "/static/"
+STATIC_URL = "/django_static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
 REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
@@ -204,3 +204,5 @@ CHANNEL_LAYERS = {
 }
 
 ENCRYPTION_KEY = os.getenv('EXCHANGE_ENCRYPTION_KEY')
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

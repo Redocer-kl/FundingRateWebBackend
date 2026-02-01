@@ -19,7 +19,7 @@ const CoinDetailPage = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        api.get(`coin-detail/${symbol}/`)
+        api.get(`api/coin-detail/${symbol}/`)
             .then(res => {
                 setData(res.data);
                 setLoading(false);

@@ -10,7 +10,7 @@ export const AuthProvider = ({ children }) => {
     const navigate = useNavigate();
 
     const login = async (username, password) => {
-        const res = await api.post('token/', { username, password });
+        const res = await api.post('api/token/', { username, password });
         localStorage.setItem('access', res.data.access);
         localStorage.setItem('refresh', res.data.refresh);
         localStorage.setItem('username', username);

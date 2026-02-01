@@ -3,7 +3,7 @@ import { TradeContext } from '../context/TradeContext';
 import OrderBook from '../components/OrderBook';     
 import CandleChart from '../components/CandleChart';
 import api from '../api'; 
-// 1. Импортируем toast
+
 import { toast } from 'react-toastify'; 
 
 const DashboardPage = () => {
@@ -53,8 +53,7 @@ const DashboardPage = () => {
         };
 
         try {
-            const response = await api.post('/positions/', payload);
-            // 2. Успешное уведомление
+            const response = await api.post('api/positions/', payload);
             toast.success(
                 <div>
                     <strong>✅ Стратегия запущена!</strong>
@@ -64,7 +63,6 @@ const DashboardPage = () => {
             );
         } catch (error) {
             console.error("Execution error:", error);
-            // 3. Уведомление об ошибке
             const errorMessage = error.response?.data 
                 ? JSON.stringify(error.response.data) 
                 : "Server error";

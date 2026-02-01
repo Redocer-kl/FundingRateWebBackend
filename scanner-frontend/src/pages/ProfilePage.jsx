@@ -40,7 +40,7 @@ const ExchangeModal = ({ exchange, onClose, onSuccess }) => {
         e.preventDefault();
         setLoading(true);
         try {
-            await api.post('keys/credentials/', {
+            await api.post('api/keys/credentials/', {
                 exchange_name: exchange.name,
                 api_key: formData.api_key,
                 api_secret: formData.api_secret,
@@ -149,10 +149,10 @@ const ProfilePage = () => {
     const fetchProfileData = async () => {
         try {
             const [profRes, credRes, hlRes, pdxRes] = await Promise.all([
-                api.get('profile/'),
-                api.get('keys/credentials/'),
-                api.get('keys/hl-generate/'),
-                api.get('keys/paradex-generate/')
+                api.get('api/profile/'),
+                api.get('api/keys/credentials/'),
+                api.get('api/keys/hl-generate/'),
+                api.get('api/keys/paradex-generate/')
             ]);
             setProfile(profRes.data);
             setCredentials(credRes.data);
@@ -174,7 +174,7 @@ const ProfilePage = () => {
     const handleCreateHlAgent = async () => {
         setIsHlLoading(true);
         try {
-            const res = await api.post('keys/hl-generate/');
+            const res = await api.post('api/keys/hl-generate/');
             setHlAgent(res.data);
             toast.success("Агент создан. Теперь необходимо подтверждение в MetaMask");
         } catch (err) {
@@ -233,7 +233,7 @@ const ProfilePage = () => {
 
             const signature = await signer.signTypedData(domain, types, message);
 
-            await api.post('keys/hl-approve/', {
+            await api.post('api/keys/hl-approve/', {
                 signature: signature,
                 payload: message
             });
@@ -251,7 +251,7 @@ const ProfilePage = () => {
     const handleCreateParadexAgent = async () => {
         setIsParadexLoading(true);
         try {
-            const res = await api.post('keys/paradex-generate/');
+            const res = await api.post('api/keys/paradex-generate/');
             setParadexAgent(res.data);
             toast.success("Paradex аккаунт инициализирован");
         } catch (err) { toast.error("Ошибка создания Paradex агента"); }
@@ -279,7 +279,7 @@ const ProfilePage = () => {
 
             const signature = await signer.signTypedData(domain, types, message);
             
-            await api.post('keys/paradex-approve/', {
+            await api.post('api/keys/paradex-approve/', {
                 signature: signature,
                 account_address: paradexAgent.account_address
             });
@@ -304,7 +304,7 @@ const ProfilePage = () => {
 
         if (window.confirm(`Вы уверены, что хотите удалить ключи для ${exchangeName}?`)) {
             try {
-                await api.delete('keys/credentials/', { data: { id: cred.id } });
+                await api.delete('api/keys/credentials/', { data: { id: cred.id } });
                 toast.success(`Ключи для ${exchangeName} успешно удалены`);
                 fetchProfileData();
             } catch (err) {
@@ -341,7 +341,7 @@ const ProfilePage = () => {
         if (window.confirm("Вы уверены, что хотите закрыть эту позицию?")) {
             const toastId = toast.loading("Закрытие позиции на бирже...");
             try {
-                await api.post(`positions/${id}/close/`);
+                await api.post(`api/positions/${id}/close/`);
                 toast.update(toastId, { render: "Позиция успешно закрыта", type: "success", isLoading: false, autoClose: 3000 });
                 fetchProfileData();
             } catch (err) {

@@ -29,7 +29,7 @@ const BestOpportunitiesPage = () => {
                 page: page,
                 page_size: 12 
             };
-            const res = await api.get('best-opportunities/', { params });
+            const res = await api.get('api/best-opportunities/', { params });
             
             setOpps(res.data.results);
             setPagination({

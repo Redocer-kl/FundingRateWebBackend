@@ -11,7 +11,7 @@ const HomePage = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        api.get('stats/')
+        api.get('api/stats/')
             .then(res => {
                 setStats(res.data);
                 setLoading(false);
