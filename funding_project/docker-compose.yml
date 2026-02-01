@@ -1,6 +1,7 @@
 services:
   db:
     image: postgres:15-alpine
+    restart: always
     environment:
       POSTGRES_DB: funding_db
       POSTGRES_USER: funding_user
@@ -10,21 +11,35 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: always
 
   web:
     build: .
-    command: ["gunicorn", "funding_project.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+    command: ["daphne", "-b", "0.0.0.0", "-p", "8000", "funding_project.asgi:application"]
     volumes:
       - .:/app
     env_file: 
       - .env
     environment:
       RUN_MIGRATIONS: "1"
+      DJANGO_SETTINGS_MODULE: "funding_project.settings"
     ports:
       - "8000:8000"
     depends_on:
       - db
       - redis
+
+  market_streamer:
+    build: .
+    command: ["python", "manage.py", "run_market_worker"]
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - db  
+    restart: always
 
   worker:
     build: .

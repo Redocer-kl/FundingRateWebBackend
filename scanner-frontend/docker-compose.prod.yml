@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  frontend:
+    build:
+      context: ./scanner-frontend
+      args:
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://backend:8000}
+    ports:
+      - "3000:80"
+    depends_on:
+      - web   

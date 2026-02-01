@@ -3,12 +3,21 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from . import views, api_views
 
 api_urlpatterns = [
+    #Positions
+    path("positions/", api_views.ArbitragePositionView.as_view(), name='positions'),
+    path("positions/<int:pk>/close/", api_views.ClosePositionView.as_view(), name='position_close'),
+
+    #Proxy
+    path('proxy/kline/', api_views.ExchangeProxyView.as_view(), name='kline-proxy'),
+    path('proxy/kucoin-token/', api_views.KucoinTokenView.as_view(), name='kline-kucoin-token'),
+
     #Stats
     path('stats/', api_views.ScannerStatsView.as_view(), name='api-stats'),
 
     # CoinData
     path('funding-table/', api_views.FundingTableAPIView.as_view(), name='api_funding_table'),
     path('coin-detail/<str:symbol>/', api_views.CoinDetailAPIView.as_view(), name='api_coin_detail'),
+    path('best-opportunities/', api_views.BestOpportunitiesAPIView.as_view(), name='api_best_opportunities/'),
 
     # Auth
     path('register/', api_views.RegisterView.as_view(), name='api_register'),

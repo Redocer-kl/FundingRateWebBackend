@@ -1,10 +1,17 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useContext } from 'react';
 import { LineChart, Line, ResponsiveContainer, YAxis, ReferenceLine, CartesianGrid } from 'recharts';
 import api from '../api';
 import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
+import { TradeContext } from '../context/TradeContext'; 
+import { toast } from 'react-toastify'; 
 
 const FundingTablePage = () => {
+    const { user } = useContext(AuthContext);
+    
+    const { setLongLeg, setShortLeg } = useContext(TradeContext);
+
     const navigate = useNavigate();
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -23,7 +30,7 @@ const FundingTablePage = () => {
     const [tempFilters, setTempFilters] = useState({
         period: localStorage.getItem('f_period') || '30d',
         sort: localStorage.getItem('f_sort') || 'spread',
-        exchanges: JSON.parse(localStorage.getItem('f_exchanges')) || ['Binance', 'Bybit', 'OKX', 'Kucoin', 'Bitget']
+        exchanges: JSON.parse(localStorage.getItem('f_exchanges')) || ['Binance', 'Kucoin', 'Bitget', 'CoinEx', 'Paradex', 'Hyperliquid']
     });
 
     const [appliedFilters, setAppliedFilters] = useState({...tempFilters});
@@ -34,6 +41,22 @@ const FundingTablePage = () => {
         { label: 'Market Cap', value: 'market_cap' },
         { label: 'Объем', value: 'volume' }
     ];
+
+    const handleSelectPosition = (type, rawSymbol, exchange) => {
+        const symbol = rawSymbol.toUpperCase().endsWith('USDT') 
+            ? rawSymbol.toUpperCase() 
+            : `${rawSymbol.toUpperCase()}USDT`;
+
+        const positionData = { symbol, exchange };
+
+        if (type === 'LONG') {
+            setLongLeg(positionData);
+            toast.success(`LONG: ${symbol} (${exchange}) выбран!`, { theme: "dark" });
+        } else {
+            setShortLeg(positionData);
+            toast.error(`SHORT: ${symbol} (${exchange}) выбран!`, { theme: "dark" });
+        }
+    };
 
     const fetchFavorites = useCallback(async () => {
         const token = localStorage.getItem('access');
@@ -46,8 +69,12 @@ const FundingTablePage = () => {
     }, []);
 
     const toggleFavorite = async (symbol) => {
+        if (!user) {
+            navigate('/login'); 
+            return;
+        }
         try {
-            await api.post('favorites/toggle/', { asset_symbol: symbol });
+            await api.post('favorite/toggle/', { asset_symbol: symbol });
             setFavorites(prev => 
                 prev.includes(symbol) ? prev.filter(s => s !== symbol) : [...prev, symbol]
             );
@@ -129,15 +156,17 @@ const FundingTablePage = () => {
                                 <th className="text-end">Цена</th>
                                 <th className="text-end">Avg APR</th>
                                 <th className="text-center">Выплат</th>
+                                {/* ДОБАВИЛ КОЛОНКУ TRADE */}
+                                <th className="text-end pe-4">Trade</th>
                             </tr>
                         </thead>
                         {loading ? (
-                            <tbody><tr><td colSpan="4" className="text-center py-5">Загрузка...</td></tr></tbody>
+                            <tbody><tr><td colSpan="5" className="text-center py-5">Загрузка...</td></tr></tbody>
                         ) : (
                             data.map((item) => (
                                 <tbody key={item.symbol} className="border-bottom border-secondary border-opacity-25">
                                     <tr style={{ backgroundColor: '#1a1a1a' }}>
-                                        <td colSpan="4" className="px-3 py-2">
+                                        <td colSpan="5" className="px-3 py-2">
                                             <div className="d-flex align-items-center">
                                                 <i className={`bi ${favorites.includes(item.symbol) ? 'bi-star-fill text-warning' : 'bi-star text-light'} cursor-pointer me-3 fs-5`} 
                                                    onClick={() => toggleFavorite(item.symbol)}></i>
@@ -172,6 +201,24 @@ const FundingTablePage = () => {
                                             <td className="text-center">
                                                 <span className="badge bg-dark border border-secondary text-light">{row.frequency}x</span>
                                             </td>
+                                            
+                                            {/* === КНОПКИ LONG / SHORT === */}
+                                            <td className="text-end pe-4">
+                                                <div className="btn-group btn-group-sm">
+                                                    <button 
+                                                        className="btn btn-outline-success py-0 px-2 font-mono fw-bold" 
+                                                        title="В Лонг"
+                                                        onClick={() => handleSelectPosition('LONG', item.symbol, row.exchange)}
+                                                    >L</button>
+                                                    <button 
+                                                        className="btn btn-outline-danger py-0 px-2 font-mono fw-bold" 
+                                                        title="В Шорт"
+                                                        onClick={() => handleSelectPosition('SHORT', item.symbol, row.exchange)}
+                                                    >S</button>
+                                                </div>
+                                            </td>
+                                            {/* =========================== */}
+
                                         </tr>
                                     ))}
                                 </tbody>
@@ -180,17 +227,55 @@ const FundingTablePage = () => {
                     </table>
                 </div>
 
-                <div className="d-flex justify-content-between align-items-center p-3 bg-black border-top border-secondary">
-                    <span className="text-light small">Стр. {currentPage} из {totalPages}</span>
-                    <div className="btn-group">
-                        <button className="btn btn-sm btn-outline-secondary text-white" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
-                            <i className="bi bi-chevron-left text-warning"></i> Назад
-                        </button>
-                        <button className="btn btn-sm btn-outline-secondary text-white" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)}>
-                            Вперед <i className="bi bi-chevron-right text-warning"></i>
-                        </button>
+                {totalPages > 1 && (
+                    <div className="d-flex flex-column flex-md-row justify-content-between align-items-center p-3 bg-black border-top border-secondary gap-3">
+                        <span className="text-muted small">
+                            Показано объектов: <span className="text-white">{data.length}</span> (Стр. {currentPage} из {totalPages})
+                        </span>
+                        
+                        <nav>
+                            <ul className="pagination pagination-sm mb-0 shadow-sm">
+                                <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                                    <button 
+                                        className="page-link bg-dark border-secondary text-white px-3" 
+                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                    >
+                                        <i className="bi bi-chevron-left text-warning"></i>
+                                    </button>
+                                </li>
+
+                                {(() => {
+                                    let pages = [];
+                                    const start = Math.max(1, currentPage - 2);
+                                    const end = Math.min(totalPages, currentPage + 2);
+
+                                    for (let i = start; i <= end; i++) {
+                                        pages.push(
+                                            <li key={i} className={`page-item ${currentPage === i ? 'active' : ''}`}>
+                                                <button 
+                                                    className={`page-link border-secondary ${currentPage === i ? 'bg-warning border-warning text-dark fw-bold' : 'bg-dark text-white'}`}
+                                                    onClick={() => setCurrentPage(i)}
+                                                >
+                                                    {i}
+                                                </button>
+                                            </li>
+                                        );
+                                    }
+                                    return pages;
+                                })()}
+
+                                <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                                    <button 
+                                        className="page-link bg-dark border-secondary text-white px-3" 
+                                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                    >
+                                        <i className="bi bi-chevron-right text-warning"></i>
+                                    </button>
+                                </li>
+                            </ul>
+                        </nav>
                     </div>
-                </div>
+                )}
             </div>
 
             {/* ГРАФИК */}
@@ -218,7 +303,7 @@ const FundingTablePage = () => {
                 </div>
             )}
 
-            {/* МОДАЛКА - ВОТ ТУТ ВЕРНУЛ БИРЖИ */}
+            {/* МОДАЛКА */}
             {showFilterModal && (
                 <div className="filter-overlay" style={{ position: 'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.8)', zIndex: 11000, display:'flex', alignItems:'center', justifyContent:'center' }}>
                     <div className="filter-content bg-dark border border-secondary p-4 rounded-3 shadow-lg" style={{ width: '450px' }}>
