@@ -3,6 +3,13 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from . import views, api_views
 
 api_urlpatterns = [
+    #Keys
+    path("keys/credentials/", api_views.UserExchangeCredentialView.as_view(), name="keys-credentials"),
+    path("keys/hl-generate/", api_views.GenerateAgentView.as_view(), name="hl-generate"),
+    path("keys/hl-approve/", api_views.ApproveAgentView.as_view(), name="hl-approve"),
+    path('keys/paradex-generate/',  api_views.ParadexAgentGenerateView.as_view(), name='paradex-generate'),
+    path('keys/paradex-approve/',  api_views.ParadexAgentApproveView.as_view(), name='paradex-approve'),
+
     #Positions
     path("positions/", api_views.ArbitragePositionView.as_view(), name='positions'),
     path("positions/<int:pk>/close/", api_views.ClosePositionView.as_view(), name='position_close'),

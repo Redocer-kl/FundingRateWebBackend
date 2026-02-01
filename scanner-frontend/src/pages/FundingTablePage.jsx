@@ -62,7 +62,7 @@ const FundingTablePage = () => {
         const token = localStorage.getItem('access');
         if (token) {
             try {
-                const res = await api.get('profile/');
+                const res = await api.get('api/profile/');
                 setFavorites(res.data.favorites.map(f => f.asset_symbol));
             } catch (err) { console.error("Ошибка загрузки избранного", err); }
         }
@@ -74,7 +74,7 @@ const FundingTablePage = () => {
             return;
         }
         try {
-            await api.post('favorite/toggle/', { asset_symbol: symbol });
+            await api.post('api/favorite/toggle/', { asset_symbol: symbol });
             setFavorites(prev => 
                 prev.includes(symbol) ? prev.filter(s => s !== symbol) : [...prev, symbol]
             );
@@ -91,7 +91,7 @@ const FundingTablePage = () => {
             params.append('q', searchTerm);
             appliedFilters.exchanges.forEach(ex => params.append('exchanges', ex));
 
-            const res = await api.get(`funding-table/?${params.toString()}`);
+            const res = await api.get(`api/funding-table/?${params.toString()}`);
             setData(res.data.results || []);
             setTotalPages(res.data.total_pages || 1);
         } catch (err) { console.error(err); } finally { setLoading(false); }

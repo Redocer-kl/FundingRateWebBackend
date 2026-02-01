@@ -6,10 +6,10 @@ const Logout = () => {
     const { logout } = useContext(AuthContext);
 
     useEffect(() => {
-        logout(); // Стираем токены при монтировании компонента
+        logout(); 
     }, [logout]);
 
-    return <Navigate to="/login" />; // Перенаправляем на вход
+    return <Navigate to="/login" />; 
 };
 
 export default Logout;

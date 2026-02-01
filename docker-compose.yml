@@ -1,4 +1,7 @@
+
+
 services:
+  # === БАЗА ДАННЫХ ===
   db:
     image: postgres:15-alpine
     restart: always
@@ -9,31 +12,42 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  # === REDIS ===
   redis:
     image: redis:7-alpine
     restart: always
 
+  # === BACKEND (Django/Daphne) ===
   web:
-    build: .
+    build: ./funding_project  
     command: ["daphne", "-b", "0.0.0.0", "-p", "8000", "funding_project.asgi:application"]
     volumes:
-      - .:/app
+      - ./funding_project:/app  
+      - django_static:/app/static 
     env_file: 
       - .env
     environment:
       RUN_MIGRATIONS: "1"
       DJANGO_SETTINGS_MODULE: "funding_project.settings"
-    ports:
-      - "8000:8000"
     depends_on:
       - db
       - redis
 
+  frontend:
+    build: ./scanner-frontend
+    ports:
+      - "80:80" 
+    volumes:
+      - django_static:/app/static 
+    depends_on:
+      - web
+
+  # === WORKERS ===
   market_streamer:
-    build: .
+    build: ./funding_project
     command: ["python", "manage.py", "run_market_worker"]
     volumes:
-      - .:/app
+      - ./funding_project:/app
     env_file:
       - .env
     depends_on:
@@ -42,11 +56,11 @@ services:
     restart: always
 
   worker:
-    build: .
+    build: ./funding_project
     command: >
       celery -A funding_project worker -l info -c ${CELERY_CONCURRENCY:-4} --max-tasks-per-child=${CELERY_MAX_TASKS_PER_CHILD:-100}
     volumes:
-      - .:/app
+      - ./funding_project:/app
     env_file:
       - .env
     depends_on:
@@ -54,10 +68,10 @@ services:
       - redis
 
   beat:
-    build: .
+    build: ./funding_project
     command: celery -A funding_project beat -l info
     volumes:
-      - .:/app
+      - ./funding_project:/app
     env_file:
       - .env
     depends_on:
@@ -66,3 +80,4 @@ services:
 
 volumes:
   postgres_data:
+  django_static: 

@@ -32,10 +32,9 @@ const OrderBook = ({ symbol, exchange = 'Binance', height = '100%' }) => {
     useEffect(() => {
         let mounted = true;
         const connect = () => {
-            const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-            const wsBase = apiUrl.replace(/^http/, 'ws').replace("/api/",""); 
-            const wsUrl = `${wsBase}/ws/market/`;
-            
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host; 
+            const wsUrl = `${protocol}//${host}/ws/market/`;
             ws.current = new WebSocket(wsUrl);
             ws.current.onopen = () => {
                 if (mounted && ws.current.readyState === WebSocket.OPEN) {
