@@ -117,8 +117,8 @@ Helper endpoints to bypass CORS or fetch specific exchange tokens for the fronte
 
 1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/your-username/funding-arbitrage-terminal.git](https://github.com/your-username/funding-arbitrage-terminal.git)
-    cd funding-arbitrage-terminal
+    git clone [https://github.com/Redocer-kl/FundingRateWebBackend.git](https://github.com/Redocer-kl/FundingRateWebBackend.git)
+    cd FundingRateWebBackend
     ```
 
 2.  **Create an `.env` file** in the root directory:
