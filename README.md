@@ -142,6 +142,10 @@ Helper endpoints to bypass CORS or fetch specific exchange tokens for the fronte
 
     # Celery
     CELERY_CONCURRENCY=4
+    CELERY_MAX_TASKS_PER_CHILD=100
+
+    #Cryptography
+    EXCHANGE_ENCRYPTION_KEY=your_super_secret_key
     ```
 
 3.  **Build and Run:**
