@@ -8,6 +8,8 @@
 
 A full-stack high-frequency trading dashboard designed to identify and execute arbitrage opportunities based on funding rates across multiple cryptocurrency exchanges. The system aggregates real-time order book data via WebSockets, calculates spreads, and visualizes market depth.
 
+[Link to project](http://24funding-bot.ru/])
+
 ## Key Features
 
 * **Real-time Data Streaming:** Aggregates live Order Book data (L2) from Binance, Bybit, Kucoin, Bitget, CoinEx, Paradex, and Hyperliquid.
