@@ -1,3 +1,6 @@
 .env
 env
 funding_project/db.sqlite3
+ssl/
+scanner-frontend/nginx.conf
+docker-compose.yml
