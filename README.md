@@ -12,9 +12,9 @@ A full-stack high-frequency trading dashboard designed to identify and execute a
 
 ## Key Features
 
-![WebSite preview](First.png)
-![WebSite preview](Second.png)
-![WebSite preview](Third.png)
+<img src="First.png" width="400" alt="Project Preview">
+<img src="Second.png" width="400" alt="Project Preview">
+<img src="Third.png" width="400" alt="Project Preview">
 
 * **Real-time Data Streaming:** Aggregates live Order Book data (L2) from Binance, Bybit, Kucoin, Bitget, CoinEx, Paradex, and Hyperliquid.
 * **Arbitrage Scanner:** Automatically identifies "Best Opportunities" for Long/Short funding rate arbitrage strategies.
